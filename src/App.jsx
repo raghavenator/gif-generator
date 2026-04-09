@@ -6,7 +6,7 @@ import SportsChart  from './visualizations/SportsChart';
 import CricketChart from './visualizations/CricketChart';
 import ExportButton from './components/ExportButton';
 
-import { useStockData, FUNDAMENTAL_METRICS }     from './hooks/useStockData';
+import { useStockData, FUNDAMENTAL_METRICS, PRICE_PERIODS, FINANCIALS_PERIODS } from './hooks/useStockData';
 import { useSportsData, SPORTS_OPTIONS }         from './hooks/useSportsData';
 import { useCricketData, SAMPLE_MATCHES }        from './hooks/useCricketData';
 
@@ -148,7 +148,7 @@ function TabButton({ label, active, onClick }) {
 }
 
 export default function App() {
-  const [tab, setTab] = useState('Cricket');
+  const [tab, setTab] = useState('Stocks');
   const [gif, setGif] = useState({ fps: 24, numFrames: 72 });
   const chartRef = useRef(null);
 
@@ -157,6 +157,8 @@ export default function App() {
   const [stockSymbol,  setStockSymbol]  = useState('AAPL');
   const [stockView,    setStockView]    = useState('price'); // 'price' | 'financials'
   const [metricKey,    setMetricKey]    = useState('totalRevenue');
+  const [pricePeriod,  setPricePeriod]  = useState(90);
+  const [finPeriod,    setFinPeriod]    = useState(8);
   const [savedKeys,   setSavedKeys]   = useState(() => JSON.parse(localStorage.getItem('av_keys') || '[]'));
   const [selectedKey, setSelectedKey] = useState('demo');
   const [addingKey,   setAddingKey]   = useState(false);
@@ -287,13 +289,33 @@ export default function App() {
               <button
                 style={{ ...s.btn, ...(stockLoading ? s.btnDisabled : {}) }}
                 onClick={() => stockView === 'price'
-                  ? fetchStock(stockSymbol, activeKeyValue)
-                  : fetchFundamentals(stockSymbol, activeKeyValue, metricKey)
+                  ? fetchStock(stockSymbol, activeKeyValue, pricePeriod)
+                  : fetchFundamentals(stockSymbol, activeKeyValue, metricKey, finPeriod)
                 }
                 disabled={stockLoading}
               >
                 {stockLoading ? 'Loading…' : stockView === 'price' ? 'Load Data' : 'Load Financials'}
               </button>
+            </div>
+
+            {/* Period picker */}
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <span style={s.hint}>Period:</span>
+              {(stockView === 'price' ? PRICE_PERIODS : FINANCIALS_PERIODS).map(p => {
+                const active = stockView === 'price' ? p.days === pricePeriod : p.quarters === finPeriod;
+                return (
+                  <button
+                    key={p.label}
+                    style={{
+                      ...s.btn,
+                      padding: '4px 10px',
+                      fontSize: '12px',
+                      ...(active ? {} : { background: '#1e2130', border: '1px solid #2d3148', color: '#64748b' }),
+                    }}
+                    onClick={() => stockView === 'price' ? setPricePeriod(p.days) : setFinPeriod(p.quarters)}
+                  >{p.label}</button>
+                );
+              })}
             </div>
             {addingKey && (
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', padding: '10px 12px', background: '#1a1d27', borderRadius: '8px', border: '1px solid #2d3148' }}>

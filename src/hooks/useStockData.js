@@ -1,6 +1,20 @@
 import { useState, useCallback } from 'react';
 
-function parseAlphaVantage(json) {
+export const PRICE_PERIODS = [
+  { label: '1M',  days: 30  },
+  { label: '3M',  days: 90  },
+  { label: '6M',  days: 180 },
+  { label: '1Y',  days: 365 },
+  { label: '2Y',  days: 730 },
+];
+
+export const FINANCIALS_PERIODS = [
+  { label: '4Q',  quarters: 4  },
+  { label: '8Q',  quarters: 8  },
+  { label: '12Q', quarters: 12 },
+];
+
+function parseAlphaVantage(json, days = 90) {
   const series = json['Time Series (Daily)'];
   if (!series) return null;
   return Object.entries(series)
@@ -13,7 +27,7 @@ function parseAlphaVantage(json) {
       volume: parseInt(v['5. volume'], 10),
     }))
     .sort((a, b) => a.date - b.date)
-    .slice(-90);
+    .slice(-days);
 }
 
 export const FUNDAMENTAL_METRICS = [
@@ -30,11 +44,11 @@ function quarterLabel(dateStr) {
   return `Q${q} ${d.getFullYear()}`;
 }
 
-function parseFundamentals(json, metricKey) {
+function parseFundamentals(json, metricKey, quarters = 8) {
   const reports = json.quarterlyReports;
   if (!reports?.length) return null;
   return reports
-    .slice(0, 8)
+    .slice(0, quarters)
     .reverse()
     .map(r => ({
       quarter: quarterLabel(r.fiscalDateEnding),
@@ -53,17 +67,18 @@ export function useStockData() {
       throw new Error('API rate limit reached — try again in a minute, or get a free key at alphavantage.co');
   }
 
-  const fetchData = useCallback(async (symbol, apiKey = 'demo') => {
+  const fetchData = useCallback(async (symbol, apiKey = 'demo', days = 90) => {
     setLoading(true);
     setError(null);
     try {
+      const outputsize = days <= 100 ? 'compact' : 'full';
       const url =
         `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY` +
-        `&symbol=${encodeURIComponent(symbol)}&outputsize=compact&apikey=${apiKey}`;
+        `&symbol=${encodeURIComponent(symbol)}&outputsize=${outputsize}&apikey=${apiKey}`;
       const res  = await fetch(url);
       const json = await res.json();
       checkRateLimit(json);
-      const parsed = parseAlphaVantage(json);
+      const parsed = parseAlphaVantage(json, days);
       if (!parsed || !parsed.length) throw new Error(`No data for "${symbol}". Try IBM, AAPL, or MSFT with the demo key.`);
       setData(parsed);
     } catch (err) {
@@ -73,7 +88,7 @@ export function useStockData() {
     }
   }, []);
 
-  const fetchFundamentals = useCallback(async (symbol, apiKey, metricKey) => {
+  const fetchFundamentals = useCallback(async (symbol, apiKey, metricKey, quarters = 8) => {
     if (!apiKey || apiKey === 'demo') {
       setError('Financials require a real Alpha Vantage API key — demo key not supported.');
       return;
@@ -87,7 +102,7 @@ export function useStockData() {
       const res  = await fetch(url);
       const json = await res.json();
       checkRateLimit(json);
-      const parsed = parseFundamentals(json, metricKey);
+      const parsed = parseFundamentals(json, metricKey, quarters);
       if (!parsed || !parsed.length) throw new Error(`No financial data for "${symbol}".`);
       setFundamentals(parsed);
     } catch (err) {
