@@ -157,7 +157,7 @@ export default function App() {
   const [stockSymbol,  setStockSymbol]  = useState('AAPL');
   const [stockView,    setStockView]    = useState('price'); // 'price' | 'financials'
   const [metricKey,    setMetricKey]    = useState('totalRevenue');
-  const [pricePeriod,  setPricePeriod]  = useState(90);
+  const [pricePeriod,  setPricePeriod]  = useState('3M');
   const [finPeriod,    setFinPeriod]    = useState(8);
   const [savedKeys,   setSavedKeys]   = useState(() => JSON.parse(localStorage.getItem('av_keys') || '[]'));
   const [selectedKey, setSelectedKey] = useState('demo');
@@ -289,7 +289,7 @@ export default function App() {
               <button
                 style={{ ...s.btn, ...(stockLoading ? s.btnDisabled : {}) }}
                 onClick={() => stockView === 'price'
-                  ? fetchStock(stockSymbol, activeKeyValue, pricePeriod)
+                  ? fetchStock(stockSymbol, activeKeyValue, PRICE_PERIODS.find(p => p.label === pricePeriod))
                   : fetchFundamentals(stockSymbol, activeKeyValue, metricKey, finPeriod)
                 }
                 disabled={stockLoading}
@@ -302,7 +302,7 @@ export default function App() {
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <span style={s.hint}>Period:</span>
               {(stockView === 'price' ? PRICE_PERIODS : FINANCIALS_PERIODS).map(p => {
-                const active = stockView === 'price' ? p.days === pricePeriod : p.quarters === finPeriod;
+                const active = stockView === 'price' ? p.label === pricePeriod : p.quarters === finPeriod;
                 return (
                   <button
                     key={p.label}
@@ -312,7 +312,7 @@ export default function App() {
                       fontSize: '12px',
                       ...(active ? {} : { background: '#1e2130', border: '1px solid #2d3148', color: '#64748b' }),
                     }}
-                    onClick={() => stockView === 'price' ? setPricePeriod(p.days) : setFinPeriod(p.quarters)}
+                    onClick={() => stockView === 'price' ? setPricePeriod(p.label) : setFinPeriod(p.quarters)}
                   >{p.label}</button>
                 );
               })}

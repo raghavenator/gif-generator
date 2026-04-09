@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react';
 
 export const PRICE_PERIODS = [
-  { label: '1M',  days: 30  },
-  { label: '3M',  days: 90  },
-  { label: '6M',  days: 180 },
-  { label: '1Y',  days: 365 },
-  { label: '2Y',  days: 730 },
+  { label: '1M',      days: 30  },
+  { label: '3M',      days: 90  },
+  { label: '6M',      days: 180 },
+  { label: '1Y',      days: 365 },
+  { label: '2Y',      days: 730 },
+  { label: 'Feb 28+', fromDate: '2026-02-28' },
 ];
 
 export const FINANCIALS_PERIODS = [
@@ -14,10 +15,10 @@ export const FINANCIALS_PERIODS = [
   { label: '12Q', quarters: 12 },
 ];
 
-function parseAlphaVantage(json, days = 90) {
+function parseAlphaVantage(json, period = { days: 90 }) {
   const series = json['Time Series (Daily)'];
   if (!series) return null;
-  return Object.entries(series)
+  const all = Object.entries(series)
     .map(([date, v]) => ({
       date: new Date(date),
       open:   parseFloat(v['1. open']),
@@ -26,8 +27,13 @@ function parseAlphaVantage(json, days = 90) {
       close:  parseFloat(v['4. close']),
       volume: parseInt(v['5. volume'], 10),
     }))
-    .sort((a, b) => a.date - b.date)
-    .slice(-days);
+    .sort((a, b) => a.date - b.date);
+
+  if (period.fromDate) {
+    const from = new Date(period.fromDate);
+    return all.filter(d => d.date >= from);
+  }
+  return all.slice(-(period.days ?? 90));
 }
 
 export const FUNDAMENTAL_METRICS = [
@@ -67,18 +73,19 @@ export function useStockData() {
       throw new Error('API rate limit reached — try again in a minute, or get a free key at alphavantage.co');
   }
 
-  const fetchData = useCallback(async (symbol, apiKey = 'demo', days = 90) => {
+  const fetchData = useCallback(async (symbol, apiKey = 'demo', period = { days: 90 }) => {
     setLoading(true);
     setError(null);
     try {
-      const outputsize = days <= 100 ? 'compact' : 'full';
+      const days = period.days ?? 90;
+      const outputsize = period.fromDate || days > 100 ? 'full' : 'compact';
       const url =
         `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY` +
         `&symbol=${encodeURIComponent(symbol)}&outputsize=${outputsize}&apikey=${apiKey}`;
       const res  = await fetch(url);
       const json = await res.json();
       checkRateLimit(json);
-      const parsed = parseAlphaVantage(json, days);
+      const parsed = parseAlphaVantage(json, period);
       if (!parsed || !parsed.length) throw new Error(`No data for "${symbol}". Try IBM, AAPL, or MSFT with the demo key.`);
       setData(parsed);
     } catch (err) {
