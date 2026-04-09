@@ -1,15 +1,39 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
-import StockChart   from './visualizations/StockChart';
+import StockChart         from './visualizations/StockChart';
+import FundamentalsChart  from './visualizations/FundamentalsChart';
 import SportsChart  from './visualizations/SportsChart';
 import CricketChart from './visualizations/CricketChart';
 import ExportButton from './components/ExportButton';
 
-import { useStockData }                          from './hooks/useStockData';
+import { useStockData, FUNDAMENTAL_METRICS }     from './hooks/useStockData';
 import { useSportsData, SPORTS_OPTIONS }         from './hooks/useSportsData';
 import { useCricketData, SAMPLE_MATCHES }        from './hooks/useCricketData';
 
 const TABS = ['Stocks', 'Sports', 'Cricket'];
+
+const STOCK_OPTIONS = [
+  { symbol: 'AAPL',  name: 'Apple' },
+  { symbol: 'MSFT',  name: 'Microsoft' },
+  { symbol: 'GOOGL', name: 'Alphabet (Google)' },
+  { symbol: 'AMZN',  name: 'Amazon' },
+  { symbol: 'NVDA',  name: 'NVIDIA' },
+  { symbol: 'META',  name: 'Meta' },
+  { symbol: 'TSLA',  name: 'Tesla' },
+  { symbol: 'IBM',   name: 'IBM' },
+  { symbol: 'NFLX',  name: 'Netflix' },
+  { symbol: 'JPM',   name: 'JPMorgan Chase' },
+  { symbol: 'V',     name: 'Visa' },
+  { symbol: 'WMT',   name: 'Walmart' },
+  { symbol: 'DIS',   name: 'Disney' },
+  { symbol: 'PYPL',  name: 'PayPal' },
+  { symbol: 'INTC',  name: 'Intel' },
+  { symbol: 'AMD',   name: 'AMD' },
+  { symbol: 'BAC',   name: 'Bank of America' },
+  { symbol: 'KO',    name: 'Coca-Cola' },
+  { symbol: 'PEP',   name: 'PepsiCo' },
+  { symbol: 'SPOT',  name: 'Spotify' },
+];
 
 const s = {
   app: {
@@ -129,17 +153,49 @@ export default function App() {
   const chartRef = useRef(null);
 
   // Stock
-  const { data: stockData, loading: stockLoading, error: stockError, fetchData: fetchStock } = useStockData();
-  const [stockSymbol, setStockSymbol] = useState('IBM');
-  const [stockKey,    setStockKey]    = useState('');
+  const { data: stockData, fundamentals, loading: stockLoading, error: stockError, fetchData: fetchStock, fetchFundamentals } = useStockData();
+  const [stockSymbol,  setStockSymbol]  = useState('AAPL');
+  const [stockView,    setStockView]    = useState('price'); // 'price' | 'financials'
+  const [metricKey,    setMetricKey]    = useState('totalRevenue');
+  const [savedKeys,   setSavedKeys]   = useState(() => JSON.parse(localStorage.getItem('av_keys') || '[]'));
+  const [selectedKey, setSelectedKey] = useState('demo');
+  const [addingKey,   setAddingKey]   = useState(false);
+  const [newKeyLabel, setNewKeyLabel] = useState('');
+  const [newKeyValue, setNewKeyValue] = useState('');
+
+  useEffect(() => {
+    localStorage.setItem('av_keys', JSON.stringify(savedKeys));
+  }, [savedKeys]);
+
+  function saveKey() {
+    if (!newKeyLabel.trim() || !newKeyValue.trim()) return;
+    const entry = { label: newKeyLabel.trim(), key: newKeyValue.trim() };
+    setSavedKeys(k => [...k, entry]);
+    setSelectedKey(entry.label);
+    setNewKeyLabel('');
+    setNewKeyValue('');
+    setAddingKey(false);
+  }
+
+  function removeKey(label) {
+    setSavedKeys(k => k.filter(e => e.label !== label));
+    if (selectedKey === label) setSelectedKey('demo');
+  }
+
+  const activeKeyValue = selectedKey === 'demo'
+    ? 'demo'
+    : (savedKeys.find(e => e.label === selectedKey)?.key || 'demo');
 
   // Sports
   const { teams, loading: sportsLoading, error: sportsError, label: sportsLabel, fetchData: fetchSports } = useSportsData();
   const [sport, setSport] = useState('nba');
 
   // Cricket
-  const { match, error: cricketError, loadSample } = useCricketData();
-  const [matchId, setMatchId] = useState(SAMPLE_MATCHES[0].id);
+  const { match, liveMatches, loading: cricketLoading, error: cricketError, loadSample, fetchIPLMatches, fetchMatchScorecard } = useCricketData();
+  const [matchId,      setMatchId]      = useState(SAMPLE_MATCHES[0].id);
+  const [cricketMode,  setCricketMode]  = useState('sample'); // 'sample' | 'live'
+  const [cricKey,      setCricKey]      = useState(() => localStorage.getItem('cric_key') || '');
+  const [selectedLive, setSelectedLive] = useState('');
 
   const activeError =
     tab === 'Stocks'  ? stockError  :
@@ -164,35 +220,104 @@ export default function App() {
 
         {/* Chart */}
         <div style={s.card}>
-          {tab === 'Stocks'  && <StockChart   ref={chartRef} data={stockData} symbol={stockSymbol} />}
+          {tab === 'Stocks' && stockView === 'price'     && <StockChart        ref={chartRef} data={stockData}   symbol={stockSymbol} />}
+          {tab === 'Stocks' && stockView === 'financials' && <FundamentalsChart ref={chartRef} data={fundamentals} symbol={stockSymbol} metricLabel={FUNDAMENTAL_METRICS.find(m => m.key === metricKey)?.label} />}
           {tab === 'Sports'  && <SportsChart  ref={chartRef} teams={teams}    label={sportsLabel}  />}
           {tab === 'Cricket' && <CricketChart ref={chartRef} match={match} />}
         </div>
 
         {/* Controls */}
         {tab === 'Stocks' && (
-          <div style={s.controls}>
-            <input
-              style={{ ...s.input, width: '140px' }}
-              value={stockSymbol}
-              onChange={e => setStockSymbol(e.target.value.toUpperCase())}
-              placeholder="Symbol (IBM, AAPL…)"
-            />
-            <input
-              style={{ ...s.input, flex: 1, minWidth: '180px' }}
-              value={stockKey}
-              onChange={e => setStockKey(e.target.value)}
-              placeholder="Alpha Vantage key (blank = demo)"
-              type="password"
-            />
-            <button
-              style={{ ...s.btn, ...(stockLoading ? s.btnDisabled : {}) }}
-              onClick={() => fetchStock(stockSymbol, stockKey || 'demo')}
-              disabled={stockLoading}
-            >
-              {stockLoading ? 'Loading…' : 'Load Data'}
-            </button>
-            <span style={s.hint}>Demo key: IBM · AAPL · MSFT</span>
+          <div style={{ ...s.controls, flexDirection: 'column', alignItems: 'stretch', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+              {/* View toggle */}
+              <button
+                style={{ ...s.btn, ...(stockView === 'price' ? {} : { background: '#1e2130', border: '1px solid #2d3148', color: '#94a3b8' }) }}
+                onClick={() => setStockView('price')}
+              >Price</button>
+              <button
+                style={{ ...s.btn, ...(stockView === 'financials' ? {} : { background: '#1e2130', border: '1px solid #2d3148', color: '#94a3b8' }) }}
+                onClick={() => setStockView('financials')}
+              >Financials</button>
+
+              <select
+                style={{ ...s.select, minWidth: '180px' }}
+                value={stockSymbol}
+                onChange={e => setStockSymbol(e.target.value)}
+              >
+                {STOCK_OPTIONS.map(o => (
+                  <option key={o.symbol} value={o.symbol}>{o.name} ({o.symbol})</option>
+                ))}
+              </select>
+
+              {stockView === 'financials' && (
+                <select
+                  style={{ ...s.select, minWidth: '150px' }}
+                  value={metricKey}
+                  onChange={e => setMetricKey(e.target.value)}
+                >
+                  {FUNDAMENTAL_METRICS.map(m => (
+                    <option key={m.key} value={m.key}>{m.label}</option>
+                  ))}
+                </select>
+              )}
+
+              <select
+                style={{ ...s.select, flex: 1, minWidth: '160px' }}
+                value={selectedKey}
+                onChange={e => setSelectedKey(e.target.value)}
+              >
+                <option value="demo">Demo key (IBM · AAPL · MSFT)</option>
+                {savedKeys.map(e => (
+                  <option key={e.label} value={e.label}>{e.label}</option>
+                ))}
+              </select>
+              <button
+                style={{ ...s.btn, background: '#1e2130', border: '1px solid #2d3148', color: '#94a3b8', padding: '7px 12px' }}
+                onClick={() => setAddingKey(a => !a)}
+                title="Add API key"
+              >＋ Add key</button>
+              {selectedKey !== 'demo' && (
+                <button
+                  style={{ ...s.btn, background: '#2d1515', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '7px 12px' }}
+                  onClick={() => removeKey(selectedKey)}
+                  title="Remove selected key"
+                >Remove</button>
+              )}
+              <button
+                style={{ ...s.btn, ...(stockLoading ? s.btnDisabled : {}) }}
+                onClick={() => stockView === 'price'
+                  ? fetchStock(stockSymbol, activeKeyValue)
+                  : fetchFundamentals(stockSymbol, activeKeyValue, metricKey)
+                }
+                disabled={stockLoading}
+              >
+                {stockLoading ? 'Loading…' : stockView === 'price' ? 'Load Data' : 'Load Financials'}
+              </button>
+            </div>
+            {addingKey && (
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', padding: '10px 12px', background: '#1a1d27', borderRadius: '8px', border: '1px solid #2d3148' }}>
+                <input
+                  style={{ ...s.input, width: '120px' }}
+                  value={newKeyLabel}
+                  onChange={e => setNewKeyLabel(e.target.value)}
+                  placeholder="Label (e.g. Personal)"
+                  autoFocus
+                />
+                <input
+                  style={{ ...s.input, flex: 1, minWidth: '200px' }}
+                  value={newKeyValue}
+                  onChange={e => setNewKeyValue(e.target.value)}
+                  placeholder="Alpha Vantage API key"
+                  type="password"
+                />
+                <button style={s.btn} onClick={saveKey}>Save</button>
+                <button
+                  style={{ ...s.btn, background: 'none', border: '1px solid #2d3148', color: '#64748b' }}
+                  onClick={() => { setAddingKey(false); setNewKeyLabel(''); setNewKeyValue(''); }}
+                >Cancel</button>
+              </div>
+            )}
           </div>
         )}
 
@@ -213,15 +338,71 @@ export default function App() {
         )}
 
         {tab === 'Cricket' && (
-          <div style={s.controls}>
-            <select
-              style={{ ...s.select, flex: 1 }}
-              value={matchId}
-              onChange={e => { setMatchId(e.target.value); loadSample(e.target.value); }}
-            >
-              {SAMPLE_MATCHES.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-            <span style={s.hint}>Sample match data included · add CricAPI key in .env for live</span>
+          <div style={{ ...s.controls, flexDirection: 'column', alignItems: 'stretch', gap: '10px' }}>
+            {/* Mode toggle */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                style={{ ...s.btn, ...(cricketMode === 'sample' ? {} : { background: '#1e2130', border: '1px solid #2d3148', color: '#94a3b8' }) }}
+                onClick={() => setCricketMode('sample')}
+              >Sample Data</button>
+              <button
+                style={{ ...s.btn, ...(cricketMode === 'live' ? {} : { background: '#1e2130', border: '1px solid #2d3148', color: '#94a3b8' }) }}
+                onClick={() => setCricketMode('live')}
+              >Live IPL</button>
+            </div>
+
+            {cricketMode === 'sample' && (
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <select
+                  style={{ ...s.select, flex: 1 }}
+                  value={matchId}
+                  onChange={e => { setMatchId(e.target.value); loadSample(e.target.value); }}
+                >
+                  {SAMPLE_MATCHES.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            {cricketMode === 'live' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input
+                    style={{ ...s.input, flex: 1, minWidth: '200px' }}
+                    value={cricKey}
+                    onChange={e => { setCricKey(e.target.value); localStorage.setItem('cric_key', e.target.value); }}
+                    placeholder="CricAPI key — get free key at cricapi.com"
+                    type="password"
+                  />
+                  <button
+                    style={{ ...s.btn, ...(cricketLoading ? s.btnDisabled : {}) }}
+                    onClick={() => fetchIPLMatches(cricKey)}
+                    disabled={cricketLoading || !cricKey}
+                  >{cricketLoading ? 'Loading…' : 'Find IPL Matches'}</button>
+                </div>
+
+                {liveMatches.length > 0 && (
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <select
+                      style={{ ...s.select, flex: 1 }}
+                      value={selectedLive}
+                      onChange={e => setSelectedLive(e.target.value)}
+                    >
+                      <option value="">— Select a match —</option>
+                      {liveMatches.map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      style={{ ...s.btn, ...(cricketLoading || !selectedLive ? s.btnDisabled : {}) }}
+                      onClick={() => fetchMatchScorecard(cricKey, selectedLive, liveMatches.find(m => m.id === selectedLive)?.name)}
+                      disabled={cricketLoading || !selectedLive}
+                    >{cricketLoading ? 'Loading…' : 'Load Scorecard'}</button>
+                  </div>
+                )}
+
+                <span style={s.hint}>Free tier at cricapi.com · scorecard available after innings complete</span>
+              </div>
+            )}
           </div>
         )}
 
