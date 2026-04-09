@@ -77,8 +77,10 @@ export function useStockData() {
     setLoading(true);
     setError(null);
     try {
-      const days = period.days ?? 90;
-      const outputsize = period.fromDate || days > 100 ? 'full' : 'compact';
+      const days = period.fromDate
+        ? Math.ceil((Date.now() - new Date(period.fromDate)) / 86400000)
+        : (period.days ?? 90);
+      const outputsize = days > 100 ? 'full' : 'compact';
       const url =
         `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY` +
         `&symbol=${encodeURIComponent(symbol)}&outputsize=${outputsize}&apikey=${apiKey}`;
