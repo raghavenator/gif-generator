@@ -154,13 +154,14 @@ export default function App() {
   const chartRef = useRef(null);
 
   // Stock
-  const { data: stockData, fundamentals, loading: stockLoading, error: stockError, warning: stockWarning, fetchData: fetchStock, fetchFundamentals } = useStockData();
+  const { data: stockData, fundamentals, loading: stockLoading, error: stockError, warning: stockWarning, fetchData: fetchStock, fetchFundamentals, clearData } = useStockData();
   const [stockSymbol,  setStockSymbol]  = useState('AAPL');
   const [stockView,    setStockView]    = useState('price'); // 'price' | 'financials'
   const [metricKey,    setMetricKey]    = useState('totalRevenue');
   const [pricePeriod,  setPricePeriod]  = useState('3M');
   const [finPeriod,    setFinPeriod]    = useState(8);
   const [chartColor,   setChartColor]   = useState(() => localStorage.getItem('stock_color') || '#818cf8');
+  const [replayKey,    setReplayKey]    = useState(0);
   const [savedKeys,   setSavedKeys]   = useState(() => JSON.parse(localStorage.getItem('av_keys') || '[]'));
   const [selectedKey, setSelectedKey] = useState('demo');
   const [addingKey,   setAddingKey]   = useState(false);
@@ -240,8 +241,8 @@ export default function App() {
 
         {/* Chart */}
         <div style={s.card}>
-          {tab === 'Stocks' && stockView === 'price'     && <StockChart        ref={chartRef} data={stockData}   symbol={stockSymbol} color={chartColor} />}
-          {tab === 'Stocks' && stockView === 'financials' && <FundamentalsChart ref={chartRef} data={fundamentals} symbol={stockSymbol} color={chartColor} metricLabel={FUNDAMENTAL_METRICS.find(m => m.key === metricKey)?.label} />}
+          {tab === 'Stocks' && stockView === 'price'     && <StockChart        ref={chartRef} data={stockData}   symbol={stockSymbol} color={chartColor} companyName={STOCK_OPTIONS.find(o => o.symbol === stockSymbol)?.name ?? ''} replayKey={replayKey} />}
+          {tab === 'Stocks' && stockView === 'financials' && <FundamentalsChart ref={chartRef} data={fundamentals} symbol={stockSymbol} color={chartColor} metricLabel={FUNDAMENTAL_METRICS.find(m => m.key === metricKey)?.label} replayKey={replayKey} />}
           {tab === 'Sports'  && <SportsChart  ref={chartRef} teams={teams}    label={sportsLabel}  />}
           {tab === 'Cricket' && <CricketChart ref={chartRef} match={match} />}
         </div>
@@ -263,7 +264,7 @@ export default function App() {
               <select
                 style={{ ...s.select, minWidth: '180px' }}
                 value={stockSymbol}
-                onChange={e => setStockSymbol(e.target.value)}
+                onChange={e => { setStockSymbol(e.target.value); clearData(); }}
               >
                 {STOCK_OPTIONS.map(o => (
                   <option key={o.symbol} value={o.symbol}>{o.name} ({o.symbol})</option>
@@ -314,6 +315,10 @@ export default function App() {
               >
                 {stockLoading ? 'Loading…' : stockView === 'price' ? 'Load Data' : 'Load Financials'}
               </button>
+              <button
+                style={{ ...s.btn, background: '#1e2130', border: '1px solid #2d3148', color: '#94a3b8' }}
+                onClick={() => setReplayKey(k => k + 1)}
+              >↺ Replay</button>
             </div>
 
             {/* Period picker */}

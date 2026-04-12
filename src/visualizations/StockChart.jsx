@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 
 const W = 800, H = 450;
-const PAD = { top: 60, right: 50, bottom: 65, left: 75 };
+const PAD = { top: 85, right: 50, bottom: 85, left: 75 };
 const CW = W - PAD.left - PAD.right;
 const CH = H - PAD.top - PAD.bottom;
 
@@ -12,11 +12,14 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-function drawStockChart(canvas, data, progress, symbol, color = '#818cf8') {
+function drawStockChart(canvas, data, progress, symbol, color = '#818cf8', companyName = '') {
   const ctx = canvas.getContext('2d');
 
-  // Background
-  ctx.fillStyle = '#0d0f14';
+  // Background — dark navy gradient matching reference
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+  bgGrad.addColorStop(0, '#131822');
+  bgGrad.addColorStop(1, '#0b0e16');
+  ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, W, H);
 
   if (!data || data.length < 2) {
@@ -125,12 +128,6 @@ function drawStockChart(canvas, data, progress, symbol, color = '#818cf8') {
     ctx.beginPath(); ctx.arc(lx, ly, 2,  0, Math.PI * 2);
     ctx.fillStyle = '#fff'; ctx.fill();
 
-    // Price label
-    const labelX = Math.min(lx + 10, W - PAD.right - 72);
-    ctx.fillStyle = '#e2e8f0';
-    ctx.font = 'bold 13px monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText(`$${latest.close.toFixed(2)}`, labelX, ly + 4);
   }
 
   // Y axis labels
@@ -160,32 +157,56 @@ function drawStockChart(canvas, data, progress, symbol, color = '#818cf8') {
   ctx.lineTo(PAD.left + CW, PAD.top + CH);
   ctx.stroke();
 
-  // Title + change
-  ctx.fillStyle = '#f1f5f9';
-  ctx.font = 'bold 18px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText(symbol, PAD.left, 36);
+  // Header divider
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(PAD.left, PAD.top - 12);
+  ctx.lineTo(W - PAD.right, PAD.top - 12);
+  ctx.stroke();
 
-  if (data.length > 1 && visible.length > 0) {
-    const change = ((latest.close - data[0].close) / data[0].close) * 100;
-    ctx.fillStyle = change >= 0 ? '#34d399' : '#f87171';
-    ctx.font = '13px monospace';
-    const titleW = ctx.measureText(symbol).width;
-    ctx.fillText(`${change >= 0 ? '+' : ''}${change.toFixed(2)}%`, PAD.left + titleW + 14, 36);
+  // Title (top-left): bold ticker + lighter company name
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#f1f5f9';
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillText(symbol, PAD.left, PAD.top - 46);
+  if (companyName) {
+    const symbolW = ctx.measureText(symbol).width;
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = '14px sans-serif';
+    ctx.fillText(companyName, PAD.left + symbolW + 12, PAD.top - 46);
   }
 
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  // Price + change (top-right)
+  if (data.length > 1 && visible.length > 0) {
+    const change = ((latest.close - data[0].close) / data[0].close) * 100;
+    const isPos  = change >= 0;
+    const changeColor = isPos ? '#34d399' : '#f87171';
+
+    // Large price
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 32px sans-serif';
+    ctx.fillText(`$${latest.close.toFixed(2)}`, W - PAD.right, PAD.top - 48);
+
+    // Arrow + percent below price
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillStyle = changeColor;
+    ctx.fillText(`${isPos ? '▲' : '▼'} ${isPos ? '+' : ''}${change.toFixed(2)}%`, W - PAD.right, PAD.top - 28);
+  }
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.lineWidth = 1;
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
 }
 
-const StockChart = forwardRef(function StockChart({ data, symbol = 'STOCK', color = '#818cf8' }, ref) {
+const StockChart = forwardRef(function StockChart({ data, symbol = 'STOCK', color = '#818cf8', companyName = '', replayKey = 0 }, ref) {
   const canvasRef = useRef(null);
   const rafRef    = useRef(null);
 
   const drawFrame = useCallback((canvas, progress) => {
-    drawStockChart(canvas, data, progress, symbol, color);
-  }, [data, symbol, color]);
+    drawStockChart(canvas, data, progress, symbol, color, companyName);
+  }, [data, symbol, color, companyName]);
 
   useImperativeHandle(ref, () => ({
     drawFrame,
@@ -196,7 +217,7 @@ const StockChart = forwardRef(function StockChart({ data, symbol = 'STOCK', colo
     const canvas = canvasRef.current;
     if (!canvas) return;
     if (!data || data.length < 2) {
-      drawStockChart(canvas, data, 0, symbol, color);
+      drawStockChart(canvas, data, 0, symbol, color, companyName);
       return;
     }
 
@@ -207,13 +228,13 @@ const StockChart = forwardRef(function StockChart({ data, symbol = 'STOCK', colo
     const animate = time => {
       const t = Math.min(Math.max((time - start) / duration, 0), 1);
       const p = 1 - Math.pow(1 - t, 3);
-      drawStockChart(canvas, data, p, symbol, color);
+      drawStockChart(canvas, data, p, symbol, color, companyName);
       if (p < 1) rafRef.current = requestAnimationFrame(animate);
     };
 
     rafRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [data, symbol, color]);
+  }, [data, symbol, color, companyName, replayKey]);
 
   return (
     <canvas

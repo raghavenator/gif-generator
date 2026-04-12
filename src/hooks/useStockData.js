@@ -242,5 +242,12 @@ export function useStockData() {
     }
   }, []);
 
-  return { data, fundamentals, loading, error, warning, fetchData, fetchFundamentals };
+  const clearData = useCallback(() => {
+    setData([]);
+    setFundamentals(null);
+    setError(null);
+    setWarning(null);
+  }, []);
+
+  return { data, fundamentals, loading, error, warning, fetchData, fetchFundamentals, clearData };
 }
