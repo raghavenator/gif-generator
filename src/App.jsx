@@ -162,6 +162,7 @@ export default function App() {
   const [finPeriod,    setFinPeriod]    = useState(8);
   const [chartColor,   setChartColor]   = useState(() => localStorage.getItem('stock_color') || '#818cf8');
   const [replayKey,    setReplayKey]    = useState(0);
+  const [showGrid,     setShowGrid]     = useState(true);
   const [savedKeys,   setSavedKeys]   = useState(() => JSON.parse(localStorage.getItem('av_keys') || '[]'));
   const [selectedKey, setSelectedKey] = useState('demo');
   const [addingKey,   setAddingKey]   = useState(false);
@@ -241,7 +242,7 @@ export default function App() {
 
         {/* Chart */}
         <div style={s.card}>
-          {tab === 'Stocks' && stockView === 'price'     && <StockChart        ref={chartRef} data={stockData}   symbol={stockSymbol} color={chartColor} companyName={STOCK_OPTIONS.find(o => o.symbol === stockSymbol)?.name ?? ''} replayKey={replayKey} />}
+          {tab === 'Stocks' && stockView === 'price'     && <StockChart        ref={chartRef} data={stockData}   symbol={stockSymbol} color={chartColor} companyName={STOCK_OPTIONS.find(o => o.symbol === stockSymbol)?.name ?? ''} replayKey={replayKey} showGrid={showGrid} />}
           {tab === 'Stocks' && stockView === 'financials' && <FundamentalsChart ref={chartRef} data={fundamentals} symbol={stockSymbol} color={chartColor} metricLabel={FUNDAMENTAL_METRICS.find(m => m.key === metricKey)?.label} replayKey={replayKey} />}
           {tab === 'Sports'  && <SportsChart  ref={chartRef} teams={teams}    label={sportsLabel}  />}
           {tab === 'Cricket' && <CricketChart ref={chartRef} match={match} />}
@@ -339,7 +340,16 @@ export default function App() {
                   >{p.label}</button>
                 );
               })}
-              <span style={{ ...s.hint, marginLeft: '8px' }}>Color:</span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '8px', cursor: 'pointer', fontSize: '12px', color: '#64748b' }}>
+                <input
+                  type="checkbox"
+                  checked={showGrid}
+                  onChange={e => setShowGrid(e.target.checked)}
+                  style={{ cursor: 'pointer', accentColor: '#818cf8' }}
+                />
+                Grid
+              </label>
+              <span style={{ ...s.hint, marginLeft: '4px' }}>Color:</span>
               <input
                 type="color"
                 value={chartColor}

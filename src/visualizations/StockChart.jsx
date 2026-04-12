@@ -12,7 +12,7 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-function drawStockChart(canvas, data, progress, symbol, color = '#818cf8', companyName = '') {
+function drawStockChart(canvas, data, progress, symbol, color = '#818cf8', companyName = '', showGrid = true) {
   const ctx = canvas.getContext('2d');
 
   // Background — dark navy gradient matching reference
@@ -64,15 +64,17 @@ function drawStockChart(canvas, data, progress, symbol, color = '#818cf8', compa
   const toVolH  = v => (v / volMax) * volBarH;
 
   // Grid lines
-  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-  ctx.lineWidth = 1;
-  for (let i = 1; i <= 4; i++) {
-    const y = PAD.top + (i / 5) * CH;
-    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + CW, y); ctx.stroke();
-  }
-  for (let i = 1; i <= 3; i++) {
-    const x = PAD.left + (i / 4) * CW;
-    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top + CH); ctx.stroke();
+  if (showGrid) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i <= 4; i++) {
+      const y = PAD.top + (i / 5) * CH;
+      ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + CW, y); ctx.stroke();
+    }
+    for (let i = 1; i <= 3; i++) {
+      const x = PAD.left + (i / 4) * CW;
+      ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top + CH); ctx.stroke();
+    }
   }
 
   // Volume bars
@@ -221,13 +223,13 @@ function drawStockChart(canvas, data, progress, symbol, color = '#818cf8', compa
   ctx.stroke();
 }
 
-const StockChart = forwardRef(function StockChart({ data, symbol = 'STOCK', color = '#818cf8', companyName = '', replayKey = 0 }, ref) {
+const StockChart = forwardRef(function StockChart({ data, symbol = 'STOCK', color = '#818cf8', companyName = '', replayKey = 0, showGrid = true }, ref) {
   const canvasRef = useRef(null);
   const rafRef    = useRef(null);
 
   const drawFrame = useCallback((canvas, progress) => {
-    drawStockChart(canvas, data, progress, symbol, color, companyName);
-  }, [data, symbol, color, companyName]);
+    drawStockChart(canvas, data, progress, symbol, color, companyName, showGrid);
+  }, [data, symbol, color, companyName, showGrid]);
 
   useImperativeHandle(ref, () => ({
     drawFrame,
@@ -238,7 +240,7 @@ const StockChart = forwardRef(function StockChart({ data, symbol = 'STOCK', colo
     const canvas = canvasRef.current;
     if (!canvas) return;
     if (!data || data.length < 2) {
-      drawStockChart(canvas, data, 0, symbol, color, companyName);
+      drawStockChart(canvas, data, 0, symbol, color, companyName, showGrid);
       return;
     }
 
@@ -249,13 +251,13 @@ const StockChart = forwardRef(function StockChart({ data, symbol = 'STOCK', colo
     const animate = time => {
       const t = Math.min(Math.max((time - start) / duration, 0), 1);
       const p = 1 - Math.pow(1 - t, 3);
-      drawStockChart(canvas, data, p, symbol, color, companyName);
+      drawStockChart(canvas, data, p, symbol, color, companyName, showGrid);
       if (p < 1) rafRef.current = requestAnimationFrame(animate);
     };
 
     rafRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [data, symbol, color, companyName, replayKey]);
+  }, [data, symbol, color, companyName, replayKey, showGrid]);
 
   return (
     <canvas
