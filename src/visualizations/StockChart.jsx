@@ -1,7 +1,7 @@
 import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 
-const W = 800, H = 450;
-const PAD = { top: 85, right: 50, bottom: 85, left: 75 };
+const W = 800, H = 480;
+const PAD = { top: 100, right: 50, bottom: 100, left: 75 };
 const CW = W - PAD.left - PAD.right;
 const CH = H - PAD.top - PAD.bottom;
 
@@ -163,8 +163,8 @@ function drawStockChart(canvas, data, progress, symbol, color = '#818cf8', compa
   ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(PAD.left, PAD.top - 12);
-  ctx.lineTo(W - PAD.right, PAD.top - 12);
+  ctx.moveTo(PAD.left, PAD.top - 20);
+  ctx.lineTo(W - PAD.right, PAD.top - 20);
   ctx.stroke();
 
   // Title (top-left): bold ticker + lighter company name
@@ -203,23 +203,22 @@ function drawStockChart(canvas, data, progress, symbol, color = '#818cf8', compa
 
   // Glowing bottom edge line
   const glowGrad = ctx.createLinearGradient(0, 0, W, 0);
-  glowGrad.addColorStop(0,   'rgba(0,180,140,0.0)');
-  glowGrad.addColorStop(0.3, 'rgba(0,210,160,0.6)');
-  glowGrad.addColorStop(1,   'rgba(0,255,180,1.0)');
+  glowGrad.addColorStop(0,   'rgba(34,211,167,0.27)');
+  glowGrad.addColorStop(1,   'rgba(34,211,167,1.0)');
 
   // Soft glow halo beneath the line
-  const haloGrad = ctx.createLinearGradient(0, H - 6, 0, H);
-  haloGrad.addColorStop(0, 'rgba(0,230,170,0.18)');
-  haloGrad.addColorStop(1, 'rgba(0,230,170,0.0)');
+  const haloGrad = ctx.createLinearGradient(0, H - 8, 0, H);
+  haloGrad.addColorStop(0, 'rgba(34,211,167,0.22)');
+  haloGrad.addColorStop(1, 'rgba(34,211,167,0.0)');
   ctx.fillStyle = haloGrad;
-  ctx.fillRect(0, H - 6, W, 6);
+  ctx.fillRect(0, H - 8, W, 8);
 
   // The line itself
   ctx.beginPath();
-  ctx.moveTo(0, H - 1.5);
-  ctx.lineTo(W, H - 1.5);
+  ctx.moveTo(0, H - 2);
+  ctx.lineTo(W, H - 2);
   ctx.strokeStyle = glowGrad;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 3;
   ctx.stroke();
 }
 
