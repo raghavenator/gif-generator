@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { encodeGif } from '../gif/encodeGif';
 
-export default function ExportButton({ chartRef, settings }) {
+export default function ExportButton({ chartRef, settings, filename = 'chart' }) {
   const [status,   setStatus]   = useState('idle'); // idle | encoding | done
   const [progress, setProgress] = useState(0);
 
@@ -24,7 +24,7 @@ export default function ExportButton({ chartRef, settings }) {
       const url = URL.createObjectURL(blob);
       const a   = document.createElement('a');
       a.href     = url;
-      a.download = 'chart.gif';
+      a.download = `${filename}.gif`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

@@ -17,13 +17,18 @@ export function encodeGif(drawFn, canvas, { numFrames = 60, fps = 30, onProgress
       height: canvas.height,
     });
 
-    const delay = Math.round(1000 / fps);
+    const delay     = Math.round(1000 / fps);
+    const holdDelay = 2000; // 2 s still hold at end — single frame with long delay
 
     for (let i = 0; i < numFrames; i++) {
       const progress = numFrames === 1 ? 1 : i / (numFrames - 1);
       drawFn(canvas, progress);
       gif.addFrame(canvas, { copy: true, delay });
     }
+
+    // Hold on the final frame
+    drawFn(canvas, 1);
+    gif.addFrame(canvas, { copy: true, delay: holdDelay });
 
     gif.on('progress', p => onProgress?.(p));
     gif.on('finished', resolve);

@@ -13,6 +13,7 @@ import { useCricketData, SAMPLE_MATCHES }        from './hooks/useCricketData';
 const TABS = ['Stocks', 'Sports', 'Cricket'];
 
 const STOCK_OPTIONS = [
+  { symbol: 'DEMO',  name: '⚡ Demo Stock' },
   { symbol: 'AAPL',  name: 'Apple' },
   { symbol: 'MSFT',  name: 'Microsoft' },
   { symbol: 'GOOGL', name: 'Alphabet (Google)' },
@@ -153,7 +154,7 @@ export default function App() {
   const chartRef = useRef(null);
 
   // Stock
-  const { data: stockData, fundamentals, loading: stockLoading, error: stockError, fetchData: fetchStock, fetchFundamentals } = useStockData();
+  const { data: stockData, fundamentals, loading: stockLoading, error: stockError, warning: stockWarning, fetchData: fetchStock, fetchFundamentals } = useStockData();
   const [stockSymbol,  setStockSymbol]  = useState('AAPL');
   const [stockView,    setStockView]    = useState('price'); // 'price' | 'financials'
   const [metricKey,    setMetricKey]    = useState('totalRevenue');
@@ -168,6 +169,7 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('av_keys', JSON.stringify(savedKeys));
   }, [savedKeys]);
+
 
   function saveKey() {
     if (!newKeyLabel.trim() || !newKeyValue.trim()) return;
@@ -199,6 +201,16 @@ export default function App() {
   const [cricKey,      setCricKey]      = useState(() => localStorage.getItem('cric_key') || '');
   const [selectedLive, setSelectedLive] = useState('');
 
+  const exportFilename = (() => {
+    if (tab === 'Stocks') {
+      const company = STOCK_OPTIONS.find(o => o.symbol === stockSymbol)?.name ?? stockSymbol;
+      const view    = stockView === 'price' ? 'price' : FUNDAMENTAL_METRICS.find(m => m.key === metricKey)?.label ?? 'financials';
+      const period  = pricePeriod;
+      return `${company}-${period}-${view}`.replace(/\s+/g, '-');
+    }
+    return 'chart';
+  })();
+
   const activeError =
     tab === 'Stocks'  ? stockError  :
     tab === 'Sports'  ? sportsError :
@@ -219,6 +231,11 @@ export default function App() {
 
       <main style={s.main}>
         {activeError && <div style={s.error}>{activeError}</div>}
+        {!activeError && tab === 'Stocks' && stockWarning && (
+          <div style={{ ...s.error, background: '#2d2008', borderColor: '#92400e', color: '#fcd34d' }}>
+            ⚠ {stockWarning}
+          </div>
+        )}
 
         {/* Chart */}
         <div style={s.card}>
@@ -451,7 +468,7 @@ export default function App() {
           </div>
 
           <div style={{ marginLeft: 'auto' }}>
-            <ExportButton chartRef={chartRef} settings={gif} />
+            <ExportButton chartRef={chartRef} settings={gif} filename={exportFilename} />
           </div>
         </div>
       </main>

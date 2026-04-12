@@ -36,7 +36,10 @@ function drawCricketChart(canvas, match, progress) {
   const toX = over => PAD.left + (over / maxOvers) * CW;
   const toY = runs => PAD.top + CH - (runs / yTop) * CH;
 
-  const visOvers = Math.max(1, Math.ceil(maxOvers * progress));
+  // Smooth interpolation: fractional over position
+  const exactOvers = maxOvers * progress;
+  const visOvers   = Math.max(1, Math.min(Math.floor(exactOvers) + 1, maxOvers));
+  const frac       = exactOvers - Math.floor(exactOvers); // 0..1 within current segment
 
   // Grid
   ctx.strokeStyle = 'rgba(255,255,255,0.05)';
@@ -55,50 +58,57 @@ function drawCricketChart(canvas, match, progress) {
     { cum: c1, overs: t1.overs, color: t1.color, name: t1.name },
     { cum: c2, overs: t2.overs, color: t2.color, name: t2.name },
   ].forEach(({ cum, overs, color, name }) => {
+    if (cum.length === 0) return;
     const vis = cum.slice(0, visOvers);
     if (vis.length === 0) return;
+
+    // Interpolated tip: smoothly extend the last segment
+    const tipIdx  = Math.min(visOvers, cum.length - 1);
+    const tipPrev = cum[tipIdx - 1] ?? cum[0];
+    const tipNext = cum[tipIdx];
+    const tipRuns = tipPrev.runs + (tipNext.runs - tipPrev.runs) * frac;
+    const tipX    = toX(tipIdx - 1 + frac) + (CW / maxOvers); // x at fractional over
+    const tipY    = toY(tipRuns);
+    const atEnd   = visOvers >= cum.length;
 
     // Area fill
     ctx.beginPath();
     ctx.moveTo(toX(0), PAD.top + CH);
     vis.forEach((d, i) => ctx.lineTo(toX(i + 1), toY(d.runs)));
-    ctx.lineTo(toX(vis.length), PAD.top + CH);
+    if (!atEnd) ctx.lineTo(tipX, tipY);
+    ctx.lineTo(atEnd ? toX(vis.length) : tipX, PAD.top + CH);
     ctx.closePath();
-    ctx.fillStyle = color + '28'; // ~16% opacity
+    ctx.fillStyle = color + '28';
     ctx.fill();
 
     // Line
     ctx.beginPath();
     vis.forEach((d, i) => {
-      const x = toX(i + 1);
-      const y = toY(d.runs);
+      const x = toX(i + 1), y = toY(d.runs);
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     });
+    if (!atEnd) ctx.lineTo(tipX, tipY);
     ctx.strokeStyle = color;
     ctx.lineWidth   = 2.5;
     ctx.lineJoin    = 'round';
     ctx.stroke();
 
-    // Wicket markers (downward triangles in red)
+    // Wicket markers
     vis.forEach((d, i) => {
       if (d.wickets > 0) {
-        const x = toX(i + 1);
-        const y = toY(d.runs);
+        const x = toX(i + 1), y = toY(d.runs);
         ctx.fillStyle = '#ef4444';
         ctx.beginPath();
-        ctx.moveTo(x, y + 4);
-        ctx.lineTo(x - 5, y - 8);
-        ctx.lineTo(x + 5, y - 8);
-        ctx.closePath();
-        ctx.fill();
+        ctx.moveTo(x, y + 4); ctx.lineTo(x - 5, y - 8); ctx.lineTo(x + 5, y - 8);
+        ctx.closePath(); ctx.fill();
       }
     });
 
     // End dot + score label
     if (vis.length > 0) {
       const last = vis[vis.length - 1];
-      const lx   = toX(vis.length);
-      const ly   = toY(last.runs);
+      const lx   = atEnd ? toX(vis.length) : tipX;
+      const ly   = atEnd ? toY(last.runs)  : tipY;
 
       const glow = ctx.createRadialGradient(lx, ly, 0, lx, ly, 12);
       glow.addColorStop(0, color + 'aa');
@@ -206,7 +216,8 @@ const CricketChart = forwardRef(function CricketChart({ match }, ref) {
     const duration = 2800;
 
     const animate = time => {
-      const p = Math.min((time - start) / duration, 1);
+      const t = Math.min((time - start) / duration, 1);
+      const p = 1 - Math.pow(1 - t, 3); // ease-out cubic
       drawCricketChart(canvas, match, p);
       if (p < 1) rafRef.current = requestAnimationFrame(animate);
     };

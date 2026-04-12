@@ -13,16 +13,28 @@ function drawStockChart(canvas, data, progress, symbol) {
   ctx.fillRect(0, 0, W, H);
 
   if (!data || data.length < 2) {
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = '16px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Enter a symbol and click Load Data', W / 2, H / 2);
+    ctx.fillText('Select a stock and click Load Data', W / 2, H / 2);
     return;
   }
 
-  const n = Math.max(2, Math.ceil(data.length * progress));
+  // 1. Guard against empty or null data
+  if (!data || data.length === 0) return;
+  // Smooth interpolation
+  const exact   = (data.length - 1) * Math.max(0, progress);
+  const n       = Math.max(1, Math.min(Math.floor(exact) + 1, data.length));
+  const frac    = exact - (n - 1);
   const visible = data.slice(0, n);
-  const latest  = visible[visible.length - 1];
+  const prev    = data[Math.max(n - 2, 0)];
+  const curr    = data[n - 1];
+  const tip     = {
+    date:  new Date(prev.date.getTime() + (curr.date.getTime() - prev.date.getTime()) * frac),
+    close: prev.close + (curr.close - prev.close) * frac,
+    open:  prev.open  + (curr.open  - prev.open)  * frac,
+  };
+  const latest  = n === data.length ? curr : tip;
 
   // Scales
   const xMin = data[0].date.getTime();
@@ -64,11 +76,14 @@ function drawStockChart(canvas, data, progress, symbol) {
     ctx.fillRect(x - barW / 2, PAD.top + CH - h, barW, h);
   });
 
+  // Points to draw: all visible whole points + interpolated tip
+  const drawPoints = n < data.length ? [...visible.slice(0, -1), tip] : visible;
+
   // Area fill
-  if (visible.length > 1) {
+  if (drawPoints.length > 1) {
     ctx.beginPath();
-    ctx.moveTo(toX(visible[0].date), PAD.top + CH);
-    visible.forEach(d => ctx.lineTo(toX(d.date), toY(d.close)));
+    ctx.moveTo(toX(drawPoints[0].date), PAD.top + CH);
+    drawPoints.forEach(d => ctx.lineTo(toX(d.date), toY(d.close)));
     ctx.lineTo(toX(latest.date), PAD.top + CH);
     ctx.closePath();
     const grad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + CH);
@@ -79,9 +94,9 @@ function drawStockChart(canvas, data, progress, symbol) {
   }
 
   // Price line
-  if (visible.length > 1) {
+  if (drawPoints.length > 1) {
     ctx.beginPath();
-    visible.forEach((d, i) => {
+    drawPoints.forEach((d, i) => {
       i === 0 ? ctx.moveTo(toX(d.date), toY(d.close))
               : ctx.lineTo(toX(d.date), toY(d.close));
     });
@@ -152,7 +167,6 @@ function drawStockChart(canvas, data, progress, symbol) {
     ctx.fillText(`${change >= 0 ? '+' : ''}${change.toFixed(2)}%`, PAD.left + titleW + 14, 36);
   }
 
-  // Subtle frame border
   ctx.strokeStyle = 'rgba(255,255,255,0.06)';
   ctx.lineWidth = 1;
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
@@ -181,10 +195,11 @@ const StockChart = forwardRef(function StockChart({ data, symbol = 'STOCK' }, re
 
     cancelAnimationFrame(rafRef.current);
     const start    = performance.now();
-    const duration = 2200;
+    const duration = 2800;
 
     const animate = time => {
-      const p = Math.min((time - start) / duration, 1);
+      const t = Math.min(Math.max((time - start) / duration, 0), 1);
+      const p = 1 - Math.pow(1 - t, 3);
       drawStockChart(canvas, data, p, symbol);
       if (p < 1) rafRef.current = requestAnimationFrame(animate);
     };

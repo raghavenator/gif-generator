@@ -12,7 +12,14 @@ function fmt(value) {
   return `$${value.toFixed(0)}`;
 }
 
-function drawChart(canvas, data, progress, symbol, metricLabel) {
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function drawChart(canvas, data, progress, symbol, metricLabel, color = '#818cf8') {
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#0d0f14';
   ctx.fillRect(0, 0, W, H);
@@ -75,8 +82,8 @@ function drawChart(canvas, data, progress, symbol, metricLabel) {
       grad.addColorStop(0, 'rgba(248,113,113,0.9)');
       grad.addColorStop(1, 'rgba(248,113,113,0.4)');
     } else {
-      grad.addColorStop(0, 'rgba(129,140,248,0.9)');
-      grad.addColorStop(1, 'rgba(129,140,248,0.35)');
+      grad.addColorStop(0, hexToRgba(color, 0.9));
+      grad.addColorStop(1, hexToRgba(color, 0.35));
     }
     ctx.fillStyle = grad;
     ctx.beginPath();
@@ -85,7 +92,7 @@ function drawChart(canvas, data, progress, symbol, metricLabel) {
 
     // value label on top of completed bars
     if (barProgress === 1) {
-      ctx.fillStyle = isNeg ? '#f87171' : '#a5b4fc';
+      ctx.fillStyle = isNeg ? '#f87171' : color;
       ctx.font = 'bold 11px monospace';
       ctx.textAlign = 'center';
       const labelY = isNeg ? zeroY + h + 14 : zeroY - h - 6;
@@ -146,15 +153,18 @@ const FundamentalsChart = forwardRef(function FundamentalsChart({ data, symbol, 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     if (!data || !data.length) {
       drawChart(canvas, data, 0, symbol, metricLabel);
       return;
     }
+
     cancelAnimationFrame(rafRef.current);
+
     const start    = performance.now();
     const duration = 2000;
     const animate  = time => {
-      const p = Math.min((time - start) / duration, 1);
+      const p = Math.min(Math.max((time - start) / duration, 0), 1);
       drawChart(canvas, data, p, symbol, metricLabel);
       if (p < 1) rafRef.current = requestAnimationFrame(animate);
     };
