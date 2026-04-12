@@ -38,25 +38,25 @@ function drawOverlay(canvas, data, progress, symbol, metricLabel, color = '#818c
 
   const { quarters, priceData } = data;
 
-  // Raw bounds from price data
-  const rawXMin = priceData[0].date.getTime();
-  const rawXMax = priceData[priceData.length - 1].date.getTime();
-  const rawRange = rawXMax - rawXMin || 1;
-
-  // One quarter's worth of ms (used for bar sizing and padding)
-  const avgQuarterMs = rawRange / Math.max(quarters.length - 1, 1);
+  // Base the X-axis on the quarters' own date span so bars are always centered
+  const firstQT      = quarters[0].date.getTime();
+  const lastQT       = quarters[quarters.length - 1].date.getTime();
+  const qSpan        = lastQT - firstQT || 1;
+  const avgQuarterMs = qSpan / Math.max(quarters.length - 1, 1);
   const barGrowMs    = avgQuarterMs * 0.2;
 
-  // Pad xMin left so the first bar isn't flush against the Y-axis,
-  // and extend xMax so the last quarter has room to fully grow
-  const lastQT = quarters[quarters.length - 1].date.getTime();
-  const xMin   = rawXMin - avgQuarterMs * 0.35;
-  const xMax   = Math.max(rawXMax, lastQT) + barGrowMs + avgQuarterMs * 0.1;
-  const xRange = xMax - xMin;
-  const toX    = d => PAD.left + ((d.getTime() - xMin) / xRange) * CW;
+  // Equal padding on both sides (0.6 quarters) → bars sit symmetrically in the chart
+  const sidePad = avgQuarterMs * 0.6;
+  const xMin    = firstQT - sidePad;
+  const xMax    = lastQT  + sidePad;
+  const xRange  = xMax - xMin;
+  const toX     = d => PAD.left + ((d.getTime() - xMin) / xRange) * CW;
 
   // Current time position driven by animation progress
   const currentT = xMin + progress * xRange;
+
+  // Only render price points that fall within the chart window
+  const chartPrice = priceData.filter(p => p.date.getTime() >= xMin - avgQuarterMs);
 
   // Financial (left) axis — scale from quarter values
   const values = quarters.map(q => q.value);
@@ -70,8 +70,8 @@ function drawOverlay(canvas, data, progress, symbol, metricLabel, color = '#818c
   const zeroY  = PAD.top + CH - ((0 - yMinV) / (yMaxV - yMinV)) * CH;
   const toYV   = v => PAD.top + CH - ((v - yMinV) / (yMaxV - yMinV)) * CH;
 
-  // Price (right) axis — scale from full daily price data
-  const closes = priceData.map(p => p.close);
+  // Price (right) axis — scale from price data within the chart window
+  const closes = chartPrice.map(p => p.close);
   const pMax   = Math.max(...closes);
   const pMin   = Math.min(...closes);
   const pRange = pMax - pMin || 1;
@@ -130,8 +130,8 @@ function drawOverlay(canvas, data, progress, symbol, metricLabel, color = '#818c
     }
   });
 
-  // Daily price line — all points up to currentT
-  const visible = priceData.filter(p => p.date.getTime() <= currentT);
+  // Daily price line — all points within the chart window up to currentT
+  const visible = chartPrice.filter(p => p.date.getTime() <= currentT);
 
   if (visible.length >= 2) {
     // Area fill under price line
@@ -222,13 +222,6 @@ function drawOverlay(canvas, data, progress, symbol, metricLabel, color = '#818c
   ctx.font = '14px sans-serif';
   ctx.fillText(`${metricLabel} + Price`, PAD.left + symW + 12, PAD.top - 46);
 
-  // Legend
-  ctx.font = 'bold 12px sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillStyle = color;
-  ctx.fillText(`▊ ${metricLabel}`, W - PAD.right - 72, PAD.top - 28);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText('— Price', W - PAD.right, PAD.top - 28);
 
   // Border
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
