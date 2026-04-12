@@ -146,7 +146,7 @@ function drawStockChart(canvas, data, progress, symbol, color = '#818cf8', compa
   [0, 0.25, 0.5, 0.75, 1].forEach(t => {
     const idx = Math.floor(t * (data.length - 1));
     const d   = data[idx];
-    ctx.fillText(`${months[d.date.getMonth()]} ${d.date.getDate()}`, toX(d.date), PAD.top + CH + 20);
+    ctx.fillText(`${months[d.date.getMonth()]} ${d.date.getDate()}`, toX(d.date), PAD.top + CH + PAD.bottom / 2 + 4);
   });
 
   // Axis lines
@@ -198,6 +198,27 @@ function drawStockChart(canvas, data, progress, symbol, color = '#818cf8', compa
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.lineWidth = 1;
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+
+  // Glowing bottom edge line
+  const glowGrad = ctx.createLinearGradient(0, 0, W, 0);
+  glowGrad.addColorStop(0,   'rgba(0,180,140,0.0)');
+  glowGrad.addColorStop(0.3, 'rgba(0,210,160,0.6)');
+  glowGrad.addColorStop(1,   'rgba(0,255,180,1.0)');
+
+  // Soft glow halo beneath the line
+  const haloGrad = ctx.createLinearGradient(0, H - 6, 0, H);
+  haloGrad.addColorStop(0, 'rgba(0,230,170,0.18)');
+  haloGrad.addColorStop(1, 'rgba(0,230,170,0.0)');
+  ctx.fillStyle = haloGrad;
+  ctx.fillRect(0, H - 6, W, 6);
+
+  // The line itself
+  ctx.beginPath();
+  ctx.moveTo(0, H - 1.5);
+  ctx.lineTo(W, H - 1.5);
+  ctx.strokeStyle = glowGrad;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
 }
 
 const StockChart = forwardRef(function StockChart({ data, symbol = 'STOCK', color = '#818cf8', companyName = '', replayKey = 0 }, ref) {
