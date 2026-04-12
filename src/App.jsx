@@ -35,6 +35,13 @@ const STOCK_OPTIONS = [
   { symbol: 'KO',    name: 'Coca-Cola' },
   { symbol: 'PEP',   name: 'PepsiCo' },
   { symbol: 'SPOT',  name: 'Spotify' },
+  { symbol: 'NOW',   name: 'ServiceNow' },
+  { symbol: 'ADBE',  name: 'Adobe' },
+  { symbol: 'CRM',   name: 'Salesforce' },
+  { symbol: 'INTU',  name: 'Intuit' },
+  { symbol: 'APP',   name: 'AppLovin' },
+  { symbol: 'SNPS',  name: 'Synopsys' },
+  { symbol: 'ADSK',  name: 'Autodesk' },
 ];
 
 const s = {
@@ -156,7 +163,7 @@ export default function App() {
 
   // Stock
   const { data: stockData, fundamentals, overlayData, loading: stockLoading, error: stockError, warning: stockWarning, fetchData: fetchStock, fetchFundamentals, fetchOverlay, fetchDataFinnhub, fetchFundamentalsFinnhub, fetchOverlayFinnhub, clearData } = useStockData();
-  const [stockSymbol,  setStockSymbol]  = useState('AAPL');
+  const [stockSymbol,  setStockSymbol]  = useState('DEMO');
   const [stockView,    setStockView]    = useState('price'); // 'price' | 'financials'
   const [metricKey,    setMetricKey]    = useState('totalRevenue');
   const [pricePeriod,  setPricePeriod]  = useState('3M');
