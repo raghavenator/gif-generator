@@ -28,7 +28,7 @@ function drawOverlay(canvas, data, progress, symbol, metricLabel, color = '#818c
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, W, H);
 
-  if (!data || !data.length) {
+  if (!data?.quarters?.length || !data?.priceData?.length) {
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = '16px sans-serif';
     ctx.textAlign = 'center';
@@ -36,38 +36,54 @@ function drawOverlay(canvas, data, progress, symbol, metricLabel, color = '#818c
     return;
   }
 
-  const n   = data.length;
-  const gap = CW / n;
-  const barW = Math.floor(gap * 0.55);
-  const toX  = i => PAD.left + gap * i + gap / 2;
+  const { quarters, priceData } = data;
 
-  // Financial axis (left)
-  const values = data.map(d => d.value);
+  // Raw bounds from price data
+  const rawXMin = priceData[0].date.getTime();
+  const rawXMax = priceData[priceData.length - 1].date.getTime();
+  const rawRange = rawXMax - rawXMin || 1;
+
+  // One quarter's worth of ms (used for bar sizing and padding)
+  const avgQuarterMs = rawRange / Math.max(quarters.length - 1, 1);
+  const barGrowMs    = avgQuarterMs * 0.2;
+
+  // Pad xMin left so the first bar isn't flush against the Y-axis,
+  // and extend xMax so the last quarter has room to fully grow
+  const lastQT = quarters[quarters.length - 1].date.getTime();
+  const xMin   = rawXMin - avgQuarterMs * 0.35;
+  const xMax   = Math.max(rawXMax, lastQT) + barGrowMs + avgQuarterMs * 0.1;
+  const xRange = xMax - xMin;
+  const toX    = d => PAD.left + ((d.getTime() - xMin) / xRange) * CW;
+
+  // Current time position driven by animation progress
+  const currentT = xMin + progress * xRange;
+
+  // Financial (left) axis — scale from quarter values
+  const values = quarters.map(q => q.value);
+  const hasNeg = values.some(v => v < 0);
   const vMax   = Math.max(...values, 0);
   const vMin   = Math.min(...values, 0);
   const vRange = vMax - vMin || 1;
   const vPad   = vRange * 0.15;
   const yMaxV  = vMax + vPad;
-  const yMinV  = vMin - vPad;
+  const yMinV  = hasNeg ? vMin - vPad : 0;   // don't push zero line up when all values positive
   const zeroY  = PAD.top + CH - ((0 - yMinV) / (yMaxV - yMinV)) * CH;
   const toYV   = v => PAD.top + CH - ((v - yMinV) / (yMaxV - yMinV)) * CH;
 
-  // Price axis (right)
-  const prices = data.map(d => d.price).filter(p => p != null);
-  const pMax   = Math.max(...prices);
-  const pMin   = Math.min(...prices);
+  // Price (right) axis — scale from full daily price data
+  const closes = priceData.map(p => p.close);
+  const pMax   = Math.max(...closes);
+  const pMin   = Math.min(...closes);
   const pRange = pMax - pMin || 1;
   const pPad   = pRange * 0.15;
   const yMaxP  = pMax + pPad;
   const yMinP  = pMin - pPad;
   const toYP   = p => PAD.top + CH - ((p - yMinP) / (yMaxP - yMinP)) * CH;
 
-  // How far along the animation is (fractional quarter index)
-  const exactN    = progress * n;
-  const fullBars  = Math.floor(exactN);
-  const partFrac  = exactN - fullBars;
+  // Bar width proportional to one quarter's share of the padded time range
+  const barW = Math.max(6, (avgQuarterMs / xRange) * CW * 0.45);
 
-  // Grid
+  // Horizontal grid lines
   ctx.strokeStyle = 'rgba(255,255,255,0.05)';
   ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
@@ -75,14 +91,24 @@ function drawOverlay(canvas, data, progress, symbol, metricLabel, color = '#818c
     ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + CW, y); ctx.stroke();
   }
 
-  // Bars
-  data.forEach((d, i) => {
-    const bp = i < fullBars ? 1 : i === fullBars ? partFrac : 0;
+  // Vertical grid lines at each quarter boundary
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  quarters.forEach(q => {
+    const x = toX(q.date);
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top + CH); ctx.stroke();
+  });
+
+  // Bars — each grows once animation passes its date
+  quarters.forEach(q => {
+    const qT = q.date.getTime();
+    const bp = Math.max(0, Math.min(1, (currentT - qT) / barGrowMs));
     if (bp === 0) return;
-    const cx  = toX(i);
+
+    const cx  = toX(q.date);
     const x   = cx - barW / 2;
-    const neg = d.value < 0;
-    const h   = Math.abs(toYV(d.value) - zeroY) * bp;
+    const neg = q.value < 0;
+    const h   = Math.abs(toYV(q.value) - zeroY) * bp;
+
     const grad = ctx.createLinearGradient(0, neg ? zeroY : zeroY - h, 0, neg ? zeroY + h : zeroY);
     if (neg) {
       grad.addColorStop(0, 'rgba(248,113,113,0.9)');
@@ -100,53 +126,57 @@ function drawOverlay(canvas, data, progress, symbol, metricLabel, color = '#818c
       ctx.fillStyle = neg ? '#f87171' : color;
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(fmt(d.value), cx, neg ? zeroY + h + 13 : zeroY - h - 5);
+      ctx.fillText(fmt(q.value), cx, neg ? zeroY + h + 13 : zeroY - h - 5);
     }
   });
 
-  // Price line — reveal in sync with bars
-  const linePoints = data
-    .slice(0, fullBars + (partFrac > 0 ? 1 : 0))
-    .map((d, i) => ({ x: toX(i), y: toYP(d.price), valid: d.price != null }))
-    .filter(p => p.valid);
+  // Daily price line — all points up to currentT
+  const visible = priceData.filter(p => p.date.getTime() <= currentT);
 
-  if (linePoints.length >= 2) {
-    // Area fill
+  if (visible.length >= 2) {
+    // Area fill under price line
     ctx.beginPath();
-    ctx.moveTo(linePoints[0].x, PAD.top + CH);
-    linePoints.forEach(p => ctx.lineTo(p.x, p.y));
-    ctx.lineTo(linePoints[linePoints.length - 1].x, PAD.top + CH);
+    ctx.moveTo(toX(visible[0].date), PAD.top + CH);
+    visible.forEach(p => ctx.lineTo(toX(p.date), toYP(p.close)));
+    ctx.lineTo(toX(visible[visible.length - 1].date), PAD.top + CH);
     ctx.closePath();
     const areaGrad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + CH);
-    areaGrad.addColorStop(0, 'rgba(255,255,255,0.10)');
+    areaGrad.addColorStop(0, 'rgba(255,255,255,0.12)');
     areaGrad.addColorStop(1, 'rgba(255,255,255,0.0)');
     ctx.fillStyle = areaGrad;
     ctx.fill();
 
-    // Line
+    // Price line
     ctx.beginPath();
-    linePoints.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    visible.forEach((p, i) =>
+      i === 0 ? ctx.moveTo(toX(p.date), toYP(p.close))
+              : ctx.lineTo(toX(p.date), toYP(p.close))
+    );
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.8;
     ctx.lineJoin = 'round';
     ctx.stroke();
+
+    // Live dot at tip
+    const tip = visible[visible.length - 1];
+    const lx  = toX(tip.date);
+    const ly  = toYP(tip.close);
+    const glow = ctx.createRadialGradient(lx, ly, 0, lx, ly, 12);
+    glow.addColorStop(0, 'rgba(255,255,255,0.4)');
+    glow.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(lx, ly, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(lx, ly, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff'; ctx.fill();
   }
 
-  // Price dots
-  linePoints.forEach(p => {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#fff';
-    ctx.fill();
-  });
-
-  // X axis labels
+  // X-axis labels — quarter labels at each bar position
   ctx.fillStyle = 'rgba(255,255,255,0.45)';
   ctx.font = '11px sans-serif';
   ctx.textAlign = 'center';
-  data.forEach((d, i) => ctx.fillText(d.quarter, toX(i), PAD.top + CH + 22));
+  quarters.forEach(q => ctx.fillText(q.quarter, toX(q.date), PAD.top + CH + 22));
 
-  // Left Y axis labels (financial metric)
+  // Left Y-axis labels (financial metric)
   ctx.textAlign = 'right';
   ctx.fillStyle = hexToRgba(color, 0.7);
   ctx.font = '10px monospace';
@@ -155,7 +185,7 @@ function drawOverlay(canvas, data, progress, symbol, metricLabel, color = '#818c
     ctx.fillText(fmt(val), PAD.left - 8, toYV(val) + 4);
   }
 
-  // Right Y axis labels (price)
+  // Right Y-axis labels (price)
   ctx.textAlign = 'left';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.font = '10px monospace';
@@ -171,19 +201,15 @@ function drawOverlay(canvas, data, progress, symbol, metricLabel, color = '#818c
   ctx.moveTo(PAD.left, PAD.top); ctx.lineTo(PAD.left, PAD.top + CH);
   ctx.lineTo(PAD.left + CW, PAD.top + CH);
   ctx.stroke();
-
-  // Right axis line
   ctx.beginPath();
-  ctx.moveTo(PAD.left + CW, PAD.top);
-  ctx.lineTo(PAD.left + CW, PAD.top + CH);
+  ctx.moveTo(PAD.left + CW, PAD.top); ctx.lineTo(PAD.left + CW, PAD.top + CH);
   ctx.stroke();
 
   // Header divider
   ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(PAD.left, PAD.top - 20);
-  ctx.lineTo(W - PAD.right, PAD.top - 20);
+  ctx.moveTo(PAD.left, PAD.top - 20); ctx.lineTo(W - PAD.right, PAD.top - 20);
   ctx.stroke();
 
   // Title
@@ -242,14 +268,14 @@ const OverlayChart = forwardRef(function OverlayChart({ data, symbol, metricLabe
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    if (!data || !data.length) {
+    if (!data?.quarters?.length || !data?.priceData?.length) {
       drawOverlay(canvas, data, 0, symbol, metricLabel, color);
       return;
     }
 
     cancelAnimationFrame(rafRef.current);
     const start    = performance.now();
-    const duration = 2400 / animSpeed;
+    const duration = 2800 / animSpeed;
 
     const animate = time => {
       const t = Math.min(Math.max((time - start) / duration, 0), 1);

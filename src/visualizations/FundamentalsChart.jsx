@@ -42,7 +42,7 @@ function drawChart(canvas, data, progress, symbol, metricLabel, color = '#818cf8
   const vRange  = vMax - vMin || 1;
   const pad     = vRange * 0.12;
   const yMax    = vMax + pad;
-  const yMin    = vMin - pad;
+  const yMin    = hasNeg ? vMin - pad : 0;
 
   // zero line Y position
   const zeroY   = PAD.top + CH - ((0 - yMin) / (yMax - yMin)) * CH;

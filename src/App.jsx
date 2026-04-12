@@ -550,7 +550,7 @@ export default function App() {
         {/* Quick Export bar */}
         {tab === 'Stocks' && (() => {
           const QUICK_FPS = 24;
-          const baseDuration = stockView === 'price' ? 2800 : stockView === 'overlay' ? 2400 : 2000;
+          const baseDuration = stockView === 'financials' ? 2000 : 2800;
           const numFrames = Math.max(12, Math.round(QUICK_FPS * (baseDuration / animSpeed / 1000)));
           const easing = t => 1 - Math.pow(1 - t, 3);
           return (

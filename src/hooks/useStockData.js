@@ -99,16 +99,6 @@ function parseFundamentalsWithDates(json, metricKey, quarters = 8) {
     }));
 }
 
-function findClosestPrice(priceData, targetDate) {
-  if (!priceData?.length) return null;
-  let closest = null;
-  let minDiff = Infinity;
-  for (const p of priceData) {
-    const diff = Math.abs(p.date.getTime() - targetDate.getTime());
-    if (diff < minDiff) { minDiff = diff; closest = p; }
-  }
-  return closest?.close ?? null;
-}
 
 function checkRateLimit(json) {
   if (json.Note || json.Information)
@@ -213,12 +203,15 @@ function makeDemoOverlay(metricKey, quarters = 8) {
     return { quarter: `Q${q} ${d.getFullYear()}`, value: base * (0.85 + rand() * 0.3), date: d };
   });
 
-  const priceData = makeDemoPriceData(quarters * 95);
-  return items.map(item => ({
-    quarter: item.quarter,
-    value:   item.value,
-    price:   findClosestPrice(priceData, item.date),
-  }));
+  // Generate daily price data covering the full quarters range
+  const firstDate = items[0].date;
+  const totalDays = Math.ceil((now - firstDate) / 86400000) + 15;
+  const priceData = makeDemoPriceData(totalDays);
+
+  return {
+    quarters: items.map(({ quarter, value, date }) => ({ quarter, value, date })),
+    priceData,
+  };
 }
 
 function makeDemoFundamentals(metricKey, quarters = 8) {
@@ -378,11 +371,7 @@ export function useStockData() {
       if (!finData?.length)   throw new Error(`No financial data for "${symbol}".`);
       if (!priceData?.length) throw new Error(`No price data for "${symbol}".`);
 
-      setOverlayData(finData.map(q => ({
-        quarter: q.quarter,
-        value:   q.value,
-        price:   findClosestPrice(priceData, q.date),
-      })));
+      setOverlayData({ quarters: finData, priceData });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -504,11 +493,7 @@ export function useStockData() {
       const priceData = parseFinnhubCandles(priceJson);
       if (!finData?.length) throw new Error(`No financial data for "${symbol}" from Finnhub.`);
 
-      setOverlayData(finData.map(q => ({
-        quarter: q.quarter,
-        value:   q.value,
-        price:   findClosestPrice(priceData, q.date),
-      })));
+      setOverlayData({ quarters: finData, priceData });
     } catch (err) {
       setError(err.message);
     } finally {
