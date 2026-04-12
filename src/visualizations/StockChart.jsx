@@ -222,7 +222,7 @@ function drawStockChart(canvas, data, progress, symbol, color = '#818cf8', compa
   ctx.stroke();
 }
 
-const StockChart = forwardRef(function StockChart({ data, symbol = 'STOCK', color = '#818cf8', companyName = '', replayKey = 0, showGrid = true }, ref) {
+const StockChart = forwardRef(function StockChart({ data, symbol = 'STOCK', color = '#818cf8', companyName = '', replayKey = 0, showGrid = true, animSpeed = 1 }, ref) {
   const canvasRef = useRef(null);
   const rafRef    = useRef(null);
 
@@ -245,7 +245,7 @@ const StockChart = forwardRef(function StockChart({ data, symbol = 'STOCK', colo
 
     cancelAnimationFrame(rafRef.current);
     const start    = performance.now();
-    const duration = 2800;
+    const duration = 2800 / animSpeed;
 
     const animate = time => {
       const t = Math.min(Math.max((time - start) / duration, 0), 1);
@@ -256,7 +256,7 @@ const StockChart = forwardRef(function StockChart({ data, symbol = 'STOCK', colo
 
     rafRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [data, symbol, color, companyName, replayKey, showGrid]);
+  }, [data, symbol, color, companyName, replayKey, showGrid, animSpeed]);
 
   return (
     <canvas

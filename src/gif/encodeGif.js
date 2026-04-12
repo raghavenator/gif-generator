@@ -7,7 +7,7 @@ import GIF from 'gif.js';
  * @param {{ numFrames?: number, fps?: number, onProgress?: (0-1) => void }} opts
  * @returns {Promise<Blob>}
  */
-export function encodeGif(drawFn, canvas, { numFrames = 60, fps = 30, onProgress } = {}) {
+export function encodeGif(drawFn, canvas, { numFrames = 60, fps = 30, onProgress, easing = t => t } = {}) {
   return new Promise((resolve, reject) => {
     const gif = new GIF({
       workers: 4,
@@ -21,7 +21,8 @@ export function encodeGif(drawFn, canvas, { numFrames = 60, fps = 30, onProgress
     const holdDelay = 2000; // 2 s still hold at end — single frame with long delay
 
     for (let i = 0; i < numFrames; i++) {
-      const progress = numFrames === 1 ? 1 : i / (numFrames - 1);
+      const t        = numFrames === 1 ? 1 : i / (numFrames - 1);
+      const progress = easing(t);
       drawFn(canvas, progress);
       gif.addFrame(canvas, { copy: true, delay });
     }

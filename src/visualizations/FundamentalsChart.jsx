@@ -137,7 +137,7 @@ function drawChart(canvas, data, progress, symbol, metricLabel, color = '#818cf8
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
 }
 
-const FundamentalsChart = forwardRef(function FundamentalsChart({ data, symbol, metricLabel, color = '#818cf8', replayKey = 0 }, ref) {
+const FundamentalsChart = forwardRef(function FundamentalsChart({ data, symbol, metricLabel, color = '#818cf8', replayKey = 0, animSpeed = 1 }, ref) {
   const canvasRef = useRef(null);
   const rafRef    = useRef(null);
 
@@ -162,7 +162,7 @@ const FundamentalsChart = forwardRef(function FundamentalsChart({ data, symbol, 
     cancelAnimationFrame(rafRef.current);
 
     const start    = performance.now();
-    const duration = 2000;
+    const duration = 2000 / animSpeed;
     const animate  = time => {
       const p = Math.min(Math.max((time - start) / duration, 0), 1);
       drawChart(canvas, data, p, symbol, metricLabel, color);
@@ -170,7 +170,7 @@ const FundamentalsChart = forwardRef(function FundamentalsChart({ data, symbol, 
     };
     rafRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [data, symbol, metricLabel, color, replayKey]);
+  }, [data, symbol, metricLabel, color, replayKey, animSpeed]);
 
   return (
     <canvas

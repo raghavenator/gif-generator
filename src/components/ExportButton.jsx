@@ -16,8 +16,9 @@ export default function ExportButton({ chartRef, settings, filename = 'chart' })
 
     try {
       const blob = await encodeGif(drawFrame, canvas, {
-        numFrames: settings.numFrames ?? 60,
-        fps:       settings.fps       ?? 30,
+        numFrames:  settings.numFrames  ?? 60,
+        fps:        settings.fps        ?? 30,
+        easing:     settings.easing,
         onProgress: p => setProgress(p),
       });
 

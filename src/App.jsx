@@ -163,6 +163,7 @@ export default function App() {
   const [chartColor,   setChartColor]   = useState(() => localStorage.getItem('stock_color') || '#818cf8');
   const [replayKey,    setReplayKey]    = useState(0);
   const [showGrid,     setShowGrid]     = useState(true);
+  const [animSpeed,    setAnimSpeed]    = useState(1);
   const [savedKeys,   setSavedKeys]   = useState(() => JSON.parse(localStorage.getItem('av_keys') || '[]'));
   const [selectedKey, setSelectedKey] = useState('demo');
   const [addingKey,   setAddingKey]   = useState(false);
@@ -242,8 +243,8 @@ export default function App() {
 
         {/* Chart */}
         <div style={s.card}>
-          {tab === 'Stocks' && stockView === 'price'     && <StockChart        ref={chartRef} data={stockData}   symbol={stockSymbol} color={chartColor} companyName={STOCK_OPTIONS.find(o => o.symbol === stockSymbol)?.name ?? ''} replayKey={replayKey} showGrid={showGrid} />}
-          {tab === 'Stocks' && stockView === 'financials' && <FundamentalsChart ref={chartRef} data={fundamentals} symbol={stockSymbol} color={chartColor} metricLabel={FUNDAMENTAL_METRICS.find(m => m.key === metricKey)?.label} replayKey={replayKey} />}
+          {tab === 'Stocks' && stockView === 'price'     && <StockChart        ref={chartRef} data={stockData}   symbol={stockSymbol} color={chartColor} companyName={STOCK_OPTIONS.find(o => o.symbol === stockSymbol)?.name ?? ''} replayKey={replayKey} showGrid={showGrid} animSpeed={animSpeed} />}
+          {tab === 'Stocks' && stockView === 'financials' && <FundamentalsChart ref={chartRef} data={fundamentals} symbol={stockSymbol} color={chartColor} metricLabel={FUNDAMENTAL_METRICS.find(m => m.key === metricKey)?.label} replayKey={replayKey} animSpeed={animSpeed} />}
           {tab === 'Sports'  && <SportsChart  ref={chartRef} teams={teams}    label={sportsLabel}  />}
           {tab === 'Cricket' && <CricketChart ref={chartRef} match={match} />}
         </div>
@@ -362,6 +363,23 @@ export default function App() {
                 onClick={() => { setChartColor('#818cf8'); localStorage.setItem('stock_color', '#818cf8'); }}
               >Reset</button>
             </div>
+
+            {/* Speed buttons */}
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <span style={s.hint}>Speed:</span>
+              {[0.25, 0.5, 1, 2].map(spd => (
+                <button
+                  key={spd}
+                  style={{
+                    ...s.btn,
+                    padding: '4px 10px',
+                    fontSize: '12px',
+                    ...(animSpeed === spd ? {} : { background: '#1e2130', border: '1px solid #2d3148', color: '#64748b' }),
+                  }}
+                  onClick={() => { setAnimSpeed(spd); setReplayKey(k => k + 1); }}
+                >{spd}x</button>
+              ))}
+            </div>
             {addingKey && (
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', padding: '10px 12px', background: '#1a1d27', borderRadius: '8px', border: '1px solid #2d3148' }}>
                 <input
@@ -472,6 +490,23 @@ export default function App() {
             )}
           </div>
         )}
+
+        {/* Quick Export bar */}
+        {tab === 'Stocks' && (() => {
+          const QUICK_FPS = 24;
+          const baseDuration = stockView === 'price' ? 2800 : 2000;
+          const numFrames = Math.max(12, Math.round(QUICK_FPS * (baseDuration / animSpeed / 1000)));
+          const easing = t => 1 - Math.pow(1 - t, 3);
+          return (
+            <div style={{ ...s.gifBar, marginBottom: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#94a3b8' }}>Quick Export</span>
+              <span style={s.hint}>{QUICK_FPS} fps · {numFrames} frames · matches {animSpeed}x animation</span>
+              <div style={{ marginLeft: 'auto' }}>
+                <ExportButton chartRef={chartRef} settings={{ fps: QUICK_FPS, numFrames, easing }} filename={exportFilename} />
+              </div>
+            </div>
+          );
+        })()}
 
         {/* GIF export bar */}
         <div style={s.gifBar}>
