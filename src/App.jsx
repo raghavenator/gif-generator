@@ -160,6 +160,7 @@ export default function App() {
   const [metricKey,    setMetricKey]    = useState('totalRevenue');
   const [pricePeriod,  setPricePeriod]  = useState('3M');
   const [finPeriod,    setFinPeriod]    = useState(8);
+  const [chartColor,   setChartColor]   = useState(() => localStorage.getItem('stock_color') || '#818cf8');
   const [savedKeys,   setSavedKeys]   = useState(() => JSON.parse(localStorage.getItem('av_keys') || '[]'));
   const [selectedKey, setSelectedKey] = useState('demo');
   const [addingKey,   setAddingKey]   = useState(false);
@@ -239,8 +240,8 @@ export default function App() {
 
         {/* Chart */}
         <div style={s.card}>
-          {tab === 'Stocks' && stockView === 'price'     && <StockChart        ref={chartRef} data={stockData}   symbol={stockSymbol} />}
-          {tab === 'Stocks' && stockView === 'financials' && <FundamentalsChart ref={chartRef} data={fundamentals} symbol={stockSymbol} metricLabel={FUNDAMENTAL_METRICS.find(m => m.key === metricKey)?.label} />}
+          {tab === 'Stocks' && stockView === 'price'     && <StockChart        ref={chartRef} data={stockData}   symbol={stockSymbol} color={chartColor} />}
+          {tab === 'Stocks' && stockView === 'financials' && <FundamentalsChart ref={chartRef} data={fundamentals} symbol={stockSymbol} color={chartColor} metricLabel={FUNDAMENTAL_METRICS.find(m => m.key === metricKey)?.label} />}
           {tab === 'Sports'  && <SportsChart  ref={chartRef} teams={teams}    label={sportsLabel}  />}
           {tab === 'Cricket' && <CricketChart ref={chartRef} match={match} />}
         </div>
@@ -333,6 +334,18 @@ export default function App() {
                   >{p.label}</button>
                 );
               })}
+              <span style={{ ...s.hint, marginLeft: '8px' }}>Color:</span>
+              <input
+                type="color"
+                value={chartColor}
+                onChange={e => { setChartColor(e.target.value); localStorage.setItem('stock_color', e.target.value); }}
+                style={{ width: '32px', height: '28px', padding: '2px', background: '#1e2130', border: '1px solid #2d3148', borderRadius: '6px', cursor: 'pointer' }}
+                title="Chart color"
+              />
+              <button
+                style={{ ...s.btn, background: '#1e2130', border: '1px solid #2d3148', color: '#64748b', padding: '4px 10px', fontSize: '12px' }}
+                onClick={() => { setChartColor('#818cf8'); localStorage.setItem('stock_color', '#818cf8'); }}
+              >Reset</button>
             </div>
             {addingKey && (
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', padding: '10px 12px', background: '#1a1d27', borderRadius: '8px', border: '1px solid #2d3148' }}>

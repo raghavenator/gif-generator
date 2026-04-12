@@ -137,13 +137,13 @@ function drawChart(canvas, data, progress, symbol, metricLabel, color = '#818cf8
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
 }
 
-const FundamentalsChart = forwardRef(function FundamentalsChart({ data, symbol, metricLabel }, ref) {
+const FundamentalsChart = forwardRef(function FundamentalsChart({ data, symbol, metricLabel, color = '#818cf8' }, ref) {
   const canvasRef = useRef(null);
   const rafRef    = useRef(null);
 
   const drawFrame = useCallback((canvas, progress) => {
-    drawChart(canvas, data, progress, symbol, metricLabel);
-  }, [data, symbol, metricLabel]);
+    drawChart(canvas, data, progress, symbol, metricLabel, color);
+  }, [data, symbol, metricLabel, color]);
 
   useImperativeHandle(ref, () => ({
     drawFrame,
@@ -155,7 +155,7 @@ const FundamentalsChart = forwardRef(function FundamentalsChart({ data, symbol, 
     if (!canvas) return;
 
     if (!data || !data.length) {
-      drawChart(canvas, data, 0, symbol, metricLabel);
+      drawChart(canvas, data, 0, symbol, metricLabel, color);
       return;
     }
 
@@ -165,12 +165,12 @@ const FundamentalsChart = forwardRef(function FundamentalsChart({ data, symbol, 
     const duration = 2000;
     const animate  = time => {
       const p = Math.min(Math.max((time - start) / duration, 0), 1);
-      drawChart(canvas, data, p, symbol, metricLabel);
+      drawChart(canvas, data, p, symbol, metricLabel, color);
       if (p < 1) rafRef.current = requestAnimationFrame(animate);
     };
     rafRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [data, symbol, metricLabel]);
+  }, [data, symbol, metricLabel, color]);
 
   return (
     <canvas
