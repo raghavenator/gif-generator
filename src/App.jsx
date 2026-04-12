@@ -2,11 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 
 import StockChart         from './visualizations/StockChart';
 import FundamentalsChart  from './visualizations/FundamentalsChart';
+import OverlayChart       from './visualizations/OverlayChart';
 import SportsChart  from './visualizations/SportsChart';
 import CricketChart from './visualizations/CricketChart';
 import ExportButton from './components/ExportButton';
 
-import { useStockData, FUNDAMENTAL_METRICS, PRICE_PERIODS, FINANCIALS_PERIODS } from './hooks/useStockData';
+import { useStockData, FUNDAMENTAL_METRICS, PRICE_PERIODS, FINANCIALS_PERIODS, } from './hooks/useStockData';
 import { useSportsData, SPORTS_OPTIONS }         from './hooks/useSportsData';
 import { useCricketData, SAMPLE_MATCHES }        from './hooks/useCricketData';
 
@@ -154,7 +155,7 @@ export default function App() {
   const chartRef = useRef(null);
 
   // Stock
-  const { data: stockData, fundamentals, loading: stockLoading, error: stockError, warning: stockWarning, fetchData: fetchStock, fetchFundamentals, clearData } = useStockData();
+  const { data: stockData, fundamentals, overlayData, loading: stockLoading, error: stockError, warning: stockWarning, fetchData: fetchStock, fetchFundamentals, fetchOverlay, fetchDataFinnhub, fetchFundamentalsFinnhub, fetchOverlayFinnhub, clearData } = useStockData();
   const [stockSymbol,  setStockSymbol]  = useState('AAPL');
   const [stockView,    setStockView]    = useState('price'); // 'price' | 'financials'
   const [metricKey,    setMetricKey]    = useState('totalRevenue');
@@ -164,6 +165,8 @@ export default function App() {
   const [replayKey,    setReplayKey]    = useState(0);
   const [showGrid,     setShowGrid]     = useState(true);
   const [animSpeed,    setAnimSpeed]    = useState(1);
+  const [dataSource,   setDataSource]   = useState(() => localStorage.getItem('data_source') || 'alphavantage');
+  const [finnhubKey,   setFinnhubKey]   = useState(() => localStorage.getItem('fh_key') || '');
   const [savedKeys,   setSavedKeys]   = useState(() => JSON.parse(localStorage.getItem('av_keys') || '[]'));
   const [selectedKey, setSelectedKey] = useState('demo');
   const [addingKey,   setAddingKey]   = useState(false);
@@ -243,8 +246,9 @@ export default function App() {
 
         {/* Chart */}
         <div style={s.card}>
-          {tab === 'Stocks' && stockView === 'price'     && <StockChart        ref={chartRef} data={stockData}   symbol={stockSymbol} color={chartColor} companyName={STOCK_OPTIONS.find(o => o.symbol === stockSymbol)?.name ?? ''} replayKey={replayKey} showGrid={showGrid} animSpeed={animSpeed} />}
+          {tab === 'Stocks' && stockView === 'price'      && <StockChart        ref={chartRef} data={stockData}   symbol={stockSymbol} color={chartColor} companyName={STOCK_OPTIONS.find(o => o.symbol === stockSymbol)?.name ?? ''} replayKey={replayKey} showGrid={showGrid} animSpeed={animSpeed} />}
           {tab === 'Stocks' && stockView === 'financials' && <FundamentalsChart ref={chartRef} data={fundamentals} symbol={stockSymbol} color={chartColor} metricLabel={FUNDAMENTAL_METRICS.find(m => m.key === metricKey)?.label} replayKey={replayKey} animSpeed={animSpeed} />}
+          {tab === 'Stocks' && stockView === 'overlay'    && <OverlayChart      ref={chartRef} data={overlayData} symbol={stockSymbol} color={chartColor} metricLabel={FUNDAMENTAL_METRICS.find(m => m.key === metricKey)?.label ?? 'Revenue'} replayKey={replayKey} animSpeed={animSpeed} />}
           {tab === 'Sports'  && <SportsChart  ref={chartRef} teams={teams}    label={sportsLabel}  />}
           {tab === 'Cricket' && <CricketChart ref={chartRef} match={match} />}
         </div>
@@ -254,14 +258,24 @@ export default function App() {
           <div style={{ ...s.controls, flexDirection: 'column', alignItems: 'stretch', gap: '10px' }}>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
               {/* View toggle */}
-              <button
-                style={{ ...s.btn, ...(stockView === 'price' ? {} : { background: '#1e2130', border: '1px solid #2d3148', color: '#94a3b8' }) }}
-                onClick={() => setStockView('price')}
-              >Price</button>
-              <button
-                style={{ ...s.btn, ...(stockView === 'financials' ? {} : { background: '#1e2130', border: '1px solid #2d3148', color: '#94a3b8' }) }}
-                onClick={() => setStockView('financials')}
-              >Financials</button>
+              {['price', 'financials', 'overlay'].map(v => {
+                const fhOnly = dataSource === 'finnhub' && v !== 'financials';
+                return (
+                  <button
+                    key={v}
+                    disabled={fhOnly}
+                    title={fhOnly ? 'Finnhub free tier supports Financials only' : undefined}
+                    style={{
+                      ...s.btn,
+                      ...(stockView === v ? {} : { background: '#1e2130', border: '1px solid #2d3148', color: '#94a3b8' }),
+                      ...(fhOnly ? { opacity: 0.35, cursor: 'not-allowed' } : {}),
+                    }}
+                    onClick={() => !fhOnly && setStockView(v)}
+                  >
+                    {v === 'price' ? 'Price' : v === 'financials' ? 'Financials' : 'P+F'}
+                  </button>
+                );
+              })}
 
               <select
                 style={{ ...s.select, minWidth: '180px' }}
@@ -273,7 +287,7 @@ export default function App() {
                 ))}
               </select>
 
-              {stockView === 'financials' && (
+              {(stockView === 'financials' || stockView === 'overlay') && (
                 <select
                   style={{ ...s.select, minWidth: '150px' }}
                   value={metricKey}
@@ -285,43 +299,85 @@ export default function App() {
                 </select>
               )}
 
-              <select
-                style={{ ...s.select, flex: 1, minWidth: '160px' }}
-                value={selectedKey}
-                onChange={e => setSelectedKey(e.target.value)}
-              >
-                <option value="demo">Demo key (IBM · AAPL · MSFT)</option>
-                {savedKeys.map(e => (
-                  <option key={e.label} value={e.label}>{e.label}</option>
-                ))}
-              </select>
-              <button
-                style={{ ...s.btn, background: '#1e2130', border: '1px solid #2d3148', color: '#94a3b8', padding: '7px 12px' }}
-                onClick={() => setAddingKey(a => !a)}
-                title="Add API key"
-              >＋ Add key</button>
-              {selectedKey !== 'demo' && (
+              {/* Data source toggle */}
+              <span style={s.hint}>Source:</span>
+              {['alphavantage', 'finnhub'].map(src => (
                 <button
-                  style={{ ...s.btn, background: '#2d1515', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '7px 12px' }}
-                  onClick={() => removeKey(selectedKey)}
-                  title="Remove selected key"
-                >Remove</button>
+                  key={src}
+                  style={{ ...s.btn, padding: '7px 12px', fontSize: '12px', ...(dataSource === src ? {} : { background: '#1e2130', border: '1px solid #2d3148', color: '#94a3b8' }) }}
+                  onClick={() => {
+                    setDataSource(src);
+                    localStorage.setItem('data_source', src);
+                    if (src === 'finnhub' && stockView !== 'financials') setStockView('financials');
+                  }}
+                >{src === 'alphavantage' ? 'Alpha Vantage' : 'Finnhub'}</button>
+              ))}
+
+              {/* Key selector — AV */}
+              {dataSource === 'alphavantage' && <>
+                <select
+                  style={{ ...s.select, flex: 1, minWidth: '160px' }}
+                  value={selectedKey}
+                  onChange={e => setSelectedKey(e.target.value)}
+                >
+                  <option value="demo">Demo key (IBM · AAPL · MSFT)</option>
+                  {savedKeys.map(e => (
+                    <option key={e.label} value={e.label}>{e.label}</option>
+                  ))}
+                </select>
+                <button
+                  style={{ ...s.btn, background: '#1e2130', border: '1px solid #2d3148', color: '#94a3b8', padding: '7px 12px' }}
+                  onClick={() => setAddingKey(a => !a)}
+                  title="Add API key"
+                >＋ Add key</button>
+                {selectedKey !== 'demo' && (
+                  <button
+                    style={{ ...s.btn, background: '#2d1515', border: '1px solid #7f1d1d', color: '#fca5a5', padding: '7px 12px' }}
+                    onClick={() => removeKey(selectedKey)}
+                    title="Remove selected key"
+                  >Remove</button>
+                )}
+              </>}
+
+              {/* Key input — Finnhub */}
+              {dataSource === 'finnhub' && (
+                <input
+                  style={{ ...s.input, flex: 1, minWidth: '180px' }}
+                  type="password"
+                  value={finnhubKey}
+                  onChange={e => { setFinnhubKey(e.target.value); localStorage.setItem('fh_key', e.target.value); }}
+                  placeholder="Finnhub API key — free at finnhub.io"
+                />
               )}
+
               <button
                 style={{ ...s.btn, ...(stockLoading ? s.btnDisabled : {}) }}
-                onClick={() => stockView === 'price'
-                  ? fetchStock(stockSymbol, activeKeyValue, PRICE_PERIODS.find(p => p.label === pricePeriod))
-                  : fetchFundamentals(stockSymbol, activeKeyValue, metricKey, finPeriod)
-                }
+                onClick={() => {
+                  if (dataSource === 'finnhub') {
+                    if (stockView === 'price')           fetchDataFinnhub(stockSymbol, finnhubKey, PRICE_PERIODS.find(p => p.label === pricePeriod));
+                    else if (stockView === 'financials') fetchFundamentalsFinnhub(stockSymbol, finnhubKey, metricKey, finPeriod);
+                    else                                 fetchOverlayFinnhub(stockSymbol, finnhubKey, metricKey, finPeriod);
+                  } else {
+                    if (stockView === 'price')           fetchStock(stockSymbol, activeKeyValue, PRICE_PERIODS.find(p => p.label === pricePeriod));
+                    else if (stockView === 'financials') fetchFundamentals(stockSymbol, activeKeyValue, metricKey, finPeriod);
+                    else                                 fetchOverlay(stockSymbol, activeKeyValue, metricKey, finPeriod);
+                  }
+                }}
                 disabled={stockLoading}
               >
-                {stockLoading ? 'Loading…' : stockView === 'price' ? 'Load Data' : 'Load Financials'}
+                {stockLoading ? 'Loading…' : stockView === 'price' ? 'Load Data' : stockView === 'financials' ? 'Load Financials' : 'Load P+F'}
               </button>
               <button
                 style={{ ...s.btn, background: '#1e2130', border: '1px solid #2d3148', color: '#94a3b8' }}
                 onClick={() => setReplayKey(k => k + 1)}
               >↺ Replay</button>
             </div>
+
+            {dataSource === 'finnhub' && (
+              <div style={{ fontSize: '12px', color: '#64748b' }}>
+                Finnhub free tier supports <strong style={{ color: '#94a3b8' }}>Financials</strong> only. Price charts and P+F overlay require a paid Finnhub plan — switch to Alpha Vantage for those views.
+              </div>
+            )}
 
             {/* Period picker */}
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -380,7 +436,7 @@ export default function App() {
                 >{spd}x</button>
               ))}
             </div>
-            {addingKey && (
+            {addingKey && dataSource === 'alphavantage' && (
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', padding: '10px 12px', background: '#1a1d27', borderRadius: '8px', border: '1px solid #2d3148' }}>
                 <input
                   style={{ ...s.input, width: '120px' }}
@@ -494,7 +550,7 @@ export default function App() {
         {/* Quick Export bar */}
         {tab === 'Stocks' && (() => {
           const QUICK_FPS = 24;
-          const baseDuration = stockView === 'price' ? 2800 : 2000;
+          const baseDuration = stockView === 'price' ? 2800 : stockView === 'overlay' ? 2400 : 2000;
           const numFrames = Math.max(12, Math.round(QUICK_FPS * (baseDuration / animSpeed / 1000)));
           const easing = t => 1 - Math.pow(1 - t, 3);
           return (
